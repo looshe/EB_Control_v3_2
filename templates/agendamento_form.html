@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Editar agendamento</h1>
+    <p>Altere os dados do agendamento antes de imprimir ou finalizar.</p>
+  </div>
+
+  <a class="btn" href="{{ url_for('agendamentos') }}">← Voltar</a>
+</div>
+
+<form method="post" class="form-card">
+
+  <div class="form-grid">
+    <label>
+      Código
+      <input value="{{ ag.codigo }}" disabled>
+    </label>
+
+    <label>
+      Cliente
+      <input name="cliente" value="{{ ag.cliente or '' }}" required>
+    </label>
+
+    <label>
+      CPF/CNPJ
+      <input name="cpf_cnpj" value="{{ ag.cpf_cnpj or '' }}">
+    </label>
+
+    <label>
+      Cidade
+      <input name="cidade" value="{{ ag.cidade or '' }}">
+    </label>
+
+    <label>
+      Endereço
+      <input name="endereco" value="{{ ag.endereco or '' }}">
+    </label>
+
+    <label>
+      NF
+      <input name="nf" value="{{ ag.nf or '' }}">
+    </label>
+
+    <label>
+      CT-e / CTR
+      <input name="cte_ctr" value="{{ ag.cte_ctr or '' }}">
+    </label>
+
+    <label>
+      Chave NF-e
+      <input name="chave_nfe" value="{{ ag.chave_nfe or '' }}">
+    </label>
+
+    <label>
+      Valor NF
+      <input name="valor_nf" value="{{ ag.valor_nf or '' }}">
+    </label>
+
+    <label>
+      Data solicitada
+      <input type="date" name="data_solicitada" value="{{ ag.data_solicitada or '' }}">
+    </label>
+
+    <label>
+      Data agendada
+      <input type="date" name="data_agendada" value="{{ ag.data_agendada or '' }}">
+    </label>
+
+    <label>
+      Status
+      <select name="status">
+        {% for s in agendamento_status %}
+        <option value="{{ s }}" {% if ag.status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <label class="full">
+    Observação
+    <textarea name="observacao" rows="5">{{ ag.observacao or '' }}</textarea>
+  </label>
+
+  <div class="form-actions">
+    <button class="btn primary" type="submit">Salvar alterações</button>
+    <a class="btn" href="{{ url_for('agendamentos') }}">Cancelar</a>
+  </div>
+
+</form>
+
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Cadastros e configurações</h1>
+    <p>Área administrativa para usuários, tipos, contatos e opções do sistema.</p>
+  </div>
+</div>
+
+<section class="grid-2">
+  <form method="post" class="panel compact-form">
+    <h2>Nova opção</h2>
+    <p class="muted">Use para criar novos tipos de pendência ou tipos de envolvidos.</p>
+    <div class="option-row">
+      <label>
+        Categoria
+        <select name="categoria">
+          <option value="tipo_pendencia">Tipo de pendência</option>
+          <option value="tipo_envolvido">Tipo de envolvido</option>
+        </select>
+      </label>
+      <label class="grow">
+        Nome da opção
+        <input name="valor" placeholder="Ex.: Falta de mercadoria, Conferente...">
+      </label>
+      <button class="btn primary">Adicionar</button>
+    </div>
+  </form>
+
+  <form method="post" action="{{ url_for('novo_usuario') }}" class="panel compact-form">
+    <h2>Novo usuário</h2>
+    <p class="muted">Somente usuários criados aqui conseguem acessar o sistema.</p>
+    <div class="form-grid admin-user-grid">
+      <label>Nome completo<input name="nome" placeholder="Ex.: Maycon Angeli" required></label>
+      <label>Usuário/login<input name="usuario" placeholder="Ex.: maycon" required></label>
+      <label>Senha<input name="senha" type="password" required></label>
+      <label>Confirmar senha<input name="confirmar" type="password" required></label>
+      <label class="check-line"><input type="checkbox" name="is_admin" value="1"> Administrador</label>
+    </div>
+    <button class="btn primary" style="margin-top:12px">Criar usuário</button>
+  </form>
+</section>
+
+<section class="panel compact-form">
+  <h2>Novo contato WhatsApp</h2>
+  <form method="post" action="{{ url_for('novo_contato') }}" class="option-row">
+    <label>Nome<input name="nome" placeholder="Jonas"></label>
+    <label>
+      Função
+      <select name="funcao">
+        <option>Autorização de Reentrega</option>
+        <option>SAC Ortobom</option>
+        <option>Comercial</option>
+        <option>Expedição</option>
+        <option>Outro</option>
+      </select>
+    </label>
+    <label>WhatsApp<input name="whatsapp" placeholder="5547999999999"></label>
+    <button class="btn primary">Salvar contato</button>
+  </form>
+  <small class="muted">Cadastre Jonas como “Autorização de Reentrega” e o SAC como “SAC Ortobom”.</small>
+</section>
+
+<section class="panel">
+  <h2>Usuários cadastrados</h2>
+  <p class="muted">Aqui você pode alterar senha, ativar/desativar, conceder/remover administrador e excluir usuários.</p>
+  <div class="table-scroll">
+    <table class="table big">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Usuário</th>
+          <th>Admin</th>
+          <th>Ativo</th>
+          <th>Alterar senha</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td>{{ u.nome }}</td>
+          <td>{{ u.usuario }}</td>
+          <td>{{ 'Sim' if u.is_admin else 'Não' }}</td>
+          <td>{{ 'Sim' if u.ativo else 'Não' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('alterar_senha_usuario', uid=u.id) }}" class="inline-form">
+              <input type="password" name="senha" placeholder="Nova senha" required>
+              <input type="password" name="confirmar" placeholder="Confirmar" required>
+              <button>Alterar</button>
+            </form>
+          </td>
+          <td>
+            <div class="inline-actions">
+              <form method="post" action="{{ url_for('alterar_status_usuario', uid=u.id) }}">
+                <button class="btn small" type="submit">{{ 'Desativar' if u.ativo else 'Ativar' }}</button>
+              </form>
+              <form method="post" action="{{ url_for('alterar_admin_usuario', uid=u.id) }}">
+                <button class="btn small" type="submit">{{ 'Remover admin' if u.is_admin else 'Tornar admin' }}</button>
+              </form>
+              <form method="post" action="{{ url_for('excluir_usuario', uid=u.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir este usuário?');">
+                <button class="btn small danger" type="submit">Excluir</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="muted">Nenhum usuário cadastrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="grid-2">
+  <div class="panel">
+    <h2>Opções cadastradas</h2>
+    <table class="table">
+      <thead><tr><th>Categoria</th><th>Valor</th></tr></thead>
+      <tbody>
+        {% for t in tipos %}
+        <tr><td>{{ t.categoria }}</td><td>{{ t.valor }}</td></tr>
+        {% else %}
+        <tr><td colspan="2" class="muted">Nenhuma opção cadastrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>Contatos cadastrados</h2>
+    <table class="table">
+      <thead><tr><th>Nome</th><th>Função</th><th>WhatsApp</th></tr></thead>
+      <tbody>
+        {% for c in contatos %}
+        <tr><td>{{ c.nome }}</td><td>{{ c.funcao }}</td><td>{{ c.whatsapp }}</td></tr>
+        {% else %}
+        <tr><td colspan="3" class="muted">Nenhum contato cadastrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Expresso Batistense - Pendências{% endblock %}</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=34">
+</head>
+
+<body class="app-body">
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-logo">
+                <img src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo">
+            </div>
+
+            <div>
+                <strong>Expresso Batistense</strong>
+                <span>Pendências</span>
+            </div>
+        </div>
+
+        <nav class="menu">
+
+            <a class="menu-item" href="{{ url_for('dashboard') }}">
+                <span>🏠</span>Dashboard
+            </a>
+
+            <a class="menu-item" href="{{ url_for('nova_pendencia') }}">
+                <span>➕</span>Anotar Pendência
+            </a>
+
+            <a class="menu-item" href="{{ url_for('pendencias', status='Pendente') }}">
+                <span>📌</span>Pendentes
+            </a>
+
+            <a class="menu-item" href="{{ url_for('pendencias', status='Em andamento') }}">
+                <span>🔄</span>Em andamento
+            </a>
+
+            <a class="menu-item" href="{{ url_for('pendencias', status='Resolvido') }}">
+                <span>✅</span>Resolvidas
+            </a>
+
+            <a class="menu-item" href="{{ url_for('pendencias') }}">
+                <span>📋</span>Todas
+            </a>
+
+            <a class="menu-item" href="{{ url_for('agendamentos') }}">
+                <span>📅</span>Agendamentos
+            </a>
+
+            <a class="menu-item" href="{{ url_for('reentregas') }}">
+                <span>🚚</span>Reentregas
+            </a>
+
+            <a class="menu-item" href="{{ url_for('cadastros') }}">
+                <span>⚙️</span>Cadastros
+            </a>
+
+            <a class="menu-item" href="{{ url_for('exportar') }}">
+                <span>📤</span>Exportar CSV
+            </a>
+
+            <a class="menu-item" href="{{ url_for('historico_geral') }}">
+                <span>🕓</span>Histórico
+            </a>
+
+        </nav>
+
+        <div class="sidebar-footer">
+
+            <div class="avatar">
+                {{ (usuario_atual['nome'][0] if usuario_atual else 'U') }}
+            </div>
+
+            <div class="user-mini">
+                <strong>{{ usuario_atual['nome'] if usuario_atual else '' }}</strong>
+                <a href="{{ url_for('logout') }}">Sair do sistema</a>
+            </div>
+
+        </div>
+
+    </aside>
+
+    <main class="main">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-wrap">
+                    {% for cat, msg in messages %}
+                        <div class="flash {{ cat }}">
+                            {{ msg }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=34"></script>
+
+</body>
+</html>

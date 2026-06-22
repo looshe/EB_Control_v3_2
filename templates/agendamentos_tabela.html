@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="page-head">
+    <div>
+        <h1>Todos os Agendamentos</h1>
+        <p>Visualização completa dos agendamentos cadastrados.</p>
+    </div>
+
+    <div class="form-actions">
+        <a class="btn primary" href="{{ url_for('agendamentos_imprimir', q=q) }}" target="_blank">
+            🖨️ Imprimir
+        </a>
+
+        <a class="btn" href="{{ url_for('agendamentos') }}">
+            ← Voltar
+        </a>
+    </div>
+</div>
+
+<form method="get" class="search-row">
+    <input
+        name="q"
+        value="{{ q }}"
+        placeholder="Pesquisar por cliente, cidade, NF, CT-e ou status">
+
+    <button>Buscar</button>
+
+    <a class="btn" href="{{ url_for('agendamentos_tabela') }}">
+        Limpar
+    </a>
+</form>
+
+<div class="panel">
+
+    <div class="table-scroll">
+
+        <table class="table big">
+
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Cliente</th>
+                    <th>Cidade</th>
+                    <th>CPF/CNPJ</th>
+                    <th>NF</th>
+                    <th>CT-e</th>
+                    <th>Solicitada</th>
+                    <th>Agendada</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+            {% for a in rows %}
+
+                <tr>
+
+                    <td>{{ a.codigo }}</td>
+
+                    <td>{{ a.cliente }}</td>
+
+                    <td>{{ a.cidade }}</td>
+
+                    <td>{{ a.cpf_cnpj }}</td>
+
+                    <td>{{ a.nf }}</td>
+
+                    <td>{{ a.cte_ctr }}</td>
+
+                    <td>{{ a.data_solicitada }}</td>
+
+                    <td>{{ a.data_agendada }}</td>
+
+                    <td>
+                        <span class="badge {{ a.status|lower|replace(' ','-') }}">
+                            {{ a.status }}
+                        </span>
+                    </td>
+
+                    <td>
+
+                        <div class="inline-actions">
+
+                            <a class="btn small"
+                               href="{{ url_for('editar_agendamento', aid=a.id) }}">
+                                ✏️ Editar
+                            </a>
+
+                            <form
+                                method="post"
+                                action="{{ url_for('excluir_agendamento', aid=a.id) }}"
+                                onsubmit="return confirm('Excluir este agendamento?');">
+
+                                <button class="btn small danger">
+                                    🗑️ Excluir
+                                </button>
+
+                            </form>
+
+                        </div>
+
+                    </td>
+
+                </tr>
+
+            {% else %}
+
+                <tr>
+                    <td colspan="10" class="muted">
+                        Nenhum agendamento encontrado.
+                    </td>
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

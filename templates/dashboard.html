@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero">
+  <div><h1>Sistema de Controle de Pendências</h1><p>Expresso Batistense</p></div>
+</section>
+<section class="cards">
+  <a href="{{ url_for('pendencias', status='Pendente') }}" class="card"><span>Pendentes</span><strong>{{ counts.pendente }}</strong><small>pendências abertas</small></a>
+  <a href="{{ url_for('pendencias', status='Em andamento') }}" class="card"><span>Em andamento</span><strong>{{ counts.andamento }}</strong><small>em tratativa</small></a>
+  <a href="{{ url_for('pendencias', status='Resolvido') }}" class="card"><span>Resolvidas</span><strong>{{ counts.resolvido }}</strong><small>histórico fechado</small></a>
+  <a href="{{ url_for('pendencias') }}?q=Crítica" class="card alert"><span>Críticas</span><strong>{{ counts.criticas }}</strong><small>atenção necessária</small></a>
+  <a href="{{ url_for('pendencias') }}" class="card"><span>Total do mês</span><strong>{{ counts.mes }}</strong><small>ocorrências no mês</small></a>
+</section>
+<section class="grid-2">
+  <div class="panel"><div class="panel-head"><h2>Pendências por tipo</h2></div>{% include 'partials/chart_bars.html' with context %}</div>
+  <div class="panel"><div class="panel-head"><h2>Status geral</h2></div><div class="donut-list">{% for item in por_status %}<div><span>{{ item.label }}</span><b>{{ item.total }}</b></div>{% endfor %}</div></div>
+</section>
+<section class="grid-2">
+  <div class="panel"><div class="panel-head"><h2>Clientes com mais ocorrências</h2></div>{% set data = por_cliente %}{% include 'partials/chart_simple.html' %}</div>
+  <div class="panel"><div class="panel-head"><h2>Evolução por mês</h2></div>{% set data = por_mes %}{% include 'partials/chart_simple.html' %}</div>
+</section>
+<section class="grid-2">
+  <div class="panel"><div class="panel-head"><h2>Pendências por filial</h2></div>{% set data = por_filial %}{% include 'partials/chart_simple.html' %}</div>
+  <div class="panel"><div class="panel-head"><h2>Operação diária</h2></div><div class="donut-list"><div><span>Agendamentos pendentes</span><b>{{ ag_counts.ag_pendente }}</b></div><div><span>Reentregas aguardando autorização</span><b>{{ ag_counts.reen_aut }}</b></div><div><span>Clientes sem contato</span><b>{{ ag_counts.sem_contato }}</b></div></div></div>
+</section>
+<section class="grid-main">
+  <div class="panel wide">
+    <div class="panel-head"><h2>Atualizações recentes</h2><a href="{{ url_for('pendencias') }}">Ver todas</a></div>
+    <table class="table">
+      <thead><tr><th>Data</th><th>Cliente</th><th>NF/CT-e</th><th>Filial</th><th>Envolvidos</th><th>Status</th><th>Resolução</th><th></th></tr></thead>
+      <tbody>{% for p in recentes %}<tr><td>{{ p.data_abertura }}</td><td>{{ p.cliente or '-' }}</td><td>{{ p.nf or p.cte_ctr or '-' }}</td><td>{{ p.filial_responsavel or '-' }}</td><td>{{ p.id|envolvidos_preview }}</td><td><span class="badge {{ p.status|lower|replace(' ', '-') }}">{{ p.status }}</span></td><td>{{ p.data_resolucao or '-' }}</td><td><a class="icon-btn" href="{{ url_for('editar_pendencia', pid=p.id) }}">✏️</a></td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  <div class="panel side"><div class="panel-head"><h2>Pendências críticas</h2></div>{% if criticas %}{% for p in criticas %}<a class="critical-item" href="{{ url_for('detalhe_pendencia', pid=p.id) }}"><b>{{ p.codigo }}</b><span>{{ p.cliente or '-' }}</span><small>{{ p|dias_aberto }} dias em aberto</small></a>{% endfor %}{% else %}<p class="muted">Nenhuma pendência crítica em aberto.</p>{% endif %}</div>
+</section>
+<div class="quick-actions"><a class="action primary" href="{{ url_for('nova_pendencia') }}">➕ Anotar pendência</a><a class="action" href="{{ url_for('pendencias') }}">🔎 Buscar pendência</a><a class="action" href="{{ url_for('agendamentos') }}">📅 Agendamentos</a><a class="action" href="{{ url_for('reentregas') }}">🚚 Reentregas</a><a class="action" href="{{ url_for('exportar') }}">📤 Exportar ocorrências</a><a class="action" href="{{ url_for('exportar', tipo='envolvidos') }}">📤 Exportar envolvidos</a></div>
+{% endblock %}

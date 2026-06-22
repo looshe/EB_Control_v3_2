@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-head"><div><h1>Histórico de edições</h1><p>Registro das ações feitas no sistema.</p></div></div>
+<div class="panel"><table class="table big"><thead><tr><th>Data/hora</th><th>Usuário</th><th>Ocorrência</th><th>Ação</th><th>Detalhes</th></tr></thead><tbody>{% for h in historico %}<tr><td>{{ h.criado_em }}</td><td>{{ h.usuario_nome or 'Sistema' }}</td><td>{{ h.codigo or '-' }}</td><td>{{ h.acao }}</td><td>{{ h.detalhes }}</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

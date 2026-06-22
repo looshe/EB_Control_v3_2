@@ -1,0 +1,4 @@
+{% set maxv = (data|map(attribute='total')|list|max) if data else 1 %}
+<div class="bar-chart">
+{% for item in data %}<div class="bar-row"><label>{{ item.label }}</label><div class="bar-bg"><span style="width: {{ (item.total / maxv * 100) if maxv else 0 }}%"></span></div><b>{{ item.total }}</b></div>{% else %}<p class="muted">Sem dados suficientes.</p>{% endfor %}
+</div>

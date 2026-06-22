@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>{{ 'Editar Pendência' if pendencia else 'Anotar Pendência' }}</h1>
+    <p>Controle de ocorrências, andamentos, resoluções e anexos.</p>
+  </div>
+  {% if pendencia %}<a class="btn" href="{{ url_for('detalhe_pendencia', pid=pendencia.id) }}">Ver detalhes</a>{% endif %}
+</div>
+
+<form method="post" enctype="multipart/form-data" class="form-card">
+  <datalist id="clientes">{% for x in clientes %}<option value="{{ x }}">{% endfor %}</datalist>
+  <datalist id="cidades">{% for x in cidades %}<option value="{{ x }}">{% endfor %}</datalist>
+  <datalist id="nomes">{% for x in nomes %}<option value="{{ x }}">{% endfor %}</datalist>
+  <datalist id="tipos-env">{% for x in tipos_envolvido %}<option value="{{ x }}">{% endfor %}</datalist>
+
+  <div class="xml-box panel">
+    <h2>Importar XML da NF-e</h2>
+    <p class="muted">Selecione o XML da NF-e e clique em preencher para puxar automaticamente cliente, CPF/CNPJ, cidade, endereço, NF, chave e valor.</p>
+    <label class="full upload">XML da NF-e<input type="file" id="xml_nfe" name="xml_nfe" accept=".xml,.zip"></label>
+    <button type="button" class="btn" id="btnLerXml">OK - Preencher dados do XML</button>
+  </div>
+
+  <div class="form-grid">
+    <label>Data<input type="date" name="data_abertura" value="{{ pendencia.data_abertura if pendencia else '' }}"></label>
+    <label>Cliente<input name="cliente" list="clientes" value="{{ pendencia.cliente if pendencia else '' }}"></label>
+    <label>Cidade<input name="cidade" list="cidades" value="{{ pendencia.cidade if pendencia else '' }}"></label>
+    <label>Filial responsável<select name="filial_responsavel">{% for f in filiais_list %}<option value="{{f}}" {% if (pendencia and pendencia.filial_responsavel==f) or (not pendencia and f=='SJB') %}selected{% endif %}>{{f}}</option>{% endfor %}</select></label>
+    <label>CPF/CNPJ<input name="cpf_cnpj" value="{{ pendencia.cpf_cnpj if pendencia else '' }}"></label>
+    <label>Endereço<input name="endereco" value="{{ pendencia.endereco if pendencia else '' }}"></label>
+    <label>NF<input name="nf" value="{{ pendencia.nf if pendencia else '' }}"></label>
+    <label>CT-e / CTR<input name="cte_ctr" value="{{ pendencia.cte_ctr if pendencia else '' }}"></label>
+    <label>Chave NF-e<input name="chave_nfe" value="{{ pendencia.chave_nfe if pendencia else '' }}"></label>
+    <label>Valor NF<input name="valor_nf" value="{{ pendencia.valor_nf if pendencia else '' }}"></label>
+    <label>Status<select name="status">{% for s in status_list %}<option value="{{s}}" {% if pendencia and pendencia.status==s %}selected{% endif %}>{{s}}</option>{% endfor %}</select></label>
+
+    <label>
+      Tipo
+      <div style="display:flex; gap:8px; align-items:center;">
+        <select name="tipo" id="tipo_pendencia" style="flex:1;">
+          <option value="">Selecione...</option>
+          {% for t in tipos %}<option value="{{t}}" {% if pendencia and pendencia.tipo==t %}selected{% endif %}>{{t}}</option>{% endfor %}
+        </select>
+        <button type="button" class="btn small" id="btnNovoTipo">+</button>
+      </div>
+    </label>
+
+    <label>Criticidade<select name="criticidade">{% for c in criticidade_list %}<option value="{{c}}" {% if (pendencia and pendencia.criticidade==c) or (not pendencia and c=='Normal') %}selected{% endif %}>{{c}}</option>{% endfor %}</select></label>
+    <label>Data resolução<input value="{{ pendencia.data_resolucao if pendencia and pendencia.data_resolucao else 'Automática ao resolver' }}" disabled></label>
+  </div>
+
+  <div class="envolvidos-box">
+    <div class="panel-head">
+      <h2>Envolvidos</h2>
+      <button type="button" class="btn small" onclick="addEnvolvido()">+ Adicionar envolvido</button>
+    </div>
+    <div id="envolvidos-list">
+      {% for e in envolvidos %}
+      <div class="envolvido-row"><input name="envolvido_tipo[]" list="tipos-env" placeholder="Tipo: Motorista, Ajudante..." value="{{e.tipo}}"><input name="envolvido_nome[]" list="nomes" placeholder="Nome" value="{{e.nome}}"><button type="button" onclick="this.parentElement.remove()">×</button></div>
+      {% endfor %}
+    </div>
+    <small class="muted">Campos opcionais. Pode adicionar quantos envolvidos precisar.</small>
+  </div>
+
+  <label class="full">Descrição do que aconteceu<textarea name="descricao" rows="5">{{ pendencia.descricao if pendencia else '' }}</textarea></label>
+  <label class="full">Andamento / tratativa<textarea name="andamento" rows="5">{{ pendencia.andamento if pendencia else '' }}</textarea></label>
+  <label class="full">Resolução<textarea name="resolucao" rows="4">{{ pendencia.resolucao if pendencia else '' }}</textarea></label>
+  <label class="full upload">Anexar CT-e, NF, PDF, fotos ou comprovantes<input type="file" name="anexos" multiple></label>
+
+  {% if anexos %}<div class="panel anexos-list"><h2>Anexos já salvos</h2>{% for a in anexos %}<a href="{{ url_for('download_anexo', pid=pendencia.id, filename=a.nome_arquivo) }}" target="_blank">📎 {{ a.nome_original }}</a>{% endfor %}</div>{% endif %}
+
+  <div class="form-actions"><button class="btn primary" type="submit">Salvar pendência</button><a class="btn" href="{{ url_for('dashboard') }}">Cancelar</a></div>
+</form>
+
+{% if historico %}<div class="panel history-corner"><h2>Histórico de edições</h2>{% for h in historico[:8] %}<div class="hist-item"><b>{{ h.acao }}</b><span>{{ h.usuario_nome or 'Sistema' }} • {{ h.criado_em }}</span><small>{{ h.detalhes }}</small></div>{% endfor %}</div>{% endif %}
+
+<script>
+function addEnvolvido() {
+  const lista = document.getElementById("envolvidos-list");
+  const div = document.createElement("div");
+  div.className = "envolvido-row";
+  div.innerHTML = `
+    <input name="envolvido_tipo[]" list="tipos-env" placeholder="Tipo: Motorista, Ajudante...">
+    <input name="envolvido_nome[]" list="nomes" placeholder="Nome">
+    <button type="button" onclick="this.parentElement.remove()">×</button>
+  `;
+  lista.appendChild(div);
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const btnXml = document.getElementById("btnLerXml");
+  const xmlInput = document.getElementById("xml_nfe");
+  const btnNovoTipo = document.getElementById("btnNovoTipo");
+
+  if (btnXml && xmlInput) {
+    btnXml.addEventListener("click", async function () {
+      const file = xmlInput.files[0];
+      if (!file) {
+        alert("Escolha um XML primeiro.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("xml_nfe", file);
+      btnXml.disabled = true;
+      btnXml.innerText = "Lendo XML...";
+
+      try {
+        const response = await fetch("/api/ler-xml-nfe", { method: "POST", body: formData });
+        const result = await response.json();
+        if (!result.ok) {
+          alert(result.erro || "Não foi possível ler o XML.");
+          return;
+        }
+        const dados = result.dados;
+        preencher("cliente", dados.cliente);
+        preencher("cpf_cnpj", dados.cpf_cnpj);
+        preencher("cidade", dados.cidade);
+        preencher("endereco", dados.endereco);
+        preencher("nf", dados.nf);
+        preencher("chave_nfe", dados.chave_nfe);
+        preencher("valor_nf", dados.valor_nf);
+        alert("Dados do XML preenchidos com sucesso.");
+      } catch (error) {
+        console.error(error);
+        alert("Erro ao ler XML da NF-e.");
+      } finally {
+        btnXml.disabled = false;
+        btnXml.innerText = "OK - Preencher dados do XML";
+      }
+    });
+  }
+
+  if (btnNovoTipo) {
+    btnNovoTipo.addEventListener("click", async function () {
+      const novoTipo = prompt("Digite o novo tipo de pendência:");
+      if (!novoTipo || !novoTipo.trim()) return;
+
+      const formData = new FormData();
+      formData.append("categoria", "tipo_pendencia");
+      formData.append("valor", novoTipo.trim());
+
+      try {
+        const response = await fetch("/api/opcoes/adicionar", { method: "POST", body: formData });
+        const result = await response.json();
+        if (!result.ok) {
+          alert(result.erro || "Não foi possível adicionar o tipo.");
+          return;
+        }
+
+        const select = document.getElementById("tipo_pendencia");
+        let option = Array.from(select.options).find(opt => opt.value.toLowerCase() === result.valor.toLowerCase());
+        if (!option) {
+          option = document.createElement("option");
+          option.value = result.valor;
+          option.textContent = result.valor;
+          select.appendChild(option);
+        }
+        select.value = result.valor;
+        alert(result.criado ? "Tipo criado com sucesso." : "Esse tipo já existia e foi selecionado.");
+      } catch (error) {
+        console.error(error);
+        alert("Erro ao adicionar tipo de pendência.");
+      }
+    });
+  }
+
+  function preencher(nome, valor) {
+    if (!valor) return;
+    const campo = document.querySelector(`[name="${nome}"]`);
+    if (campo) campo.value = valor;
+  }
+});
+</script>
+
+{% endblock %}

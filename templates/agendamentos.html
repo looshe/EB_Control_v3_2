@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Agendamentos</h1>
+    <p>Controle interno amplo de agendamentos por cliente, cidade e nota.</p>
+  </div>
+
+  <div class="form-actions">
+    <a class="btn" href="/agendamentos/tabela?q={{ q }}">📋 Ver tabela completa</a>
+    <a class="btn primary" href="/agendamentos/imprimir?q={{ q }}" target="_blank">🖨️ Imprimir lista</a>
+  </div>
+</div>
+
+<section class="cards mini-cards">
+  <a class="card" href="{{ url_for('agendamentos', q='Pendente') }}"><span>Pendentes</span><strong>{{ counts.pendente }}</strong></a>
+  <a class="card" href="{{ url_for('agendamentos', q='Agendado') }}"><span>Agendados</span><strong>{{ counts.agendado }}</strong></a>
+  <a class="card" href="{{ url_for('agendamentos', q='Finalizado') }}"><span>Finalizados</span><strong>{{ counts.finalizado }}</strong></a>
+  <a class="card alert" href="{{ url_for('agendamentos') }}"><span>Atrasados</span><strong>{{ counts.atrasado }}</strong></a>
+</section>
+
+<section class="grid-2">
+  <form method="post" enctype="multipart/form-data" class="panel compact-form">
+    <h2>Novo agendamento</h2>
+    <p class="muted">Pode preencher manualmente ou anexar um XML da NF-e para puxar cliente, CPF/CNPJ, cidade, endereço, NF, chave e valor.</p>
+
+    <label>Importar XML da NF-e
+      <input type="file" id="xml_nfe" name="xml_nfe" accept=".xml,.zip">
+    </label>
+
+    <button type="button" class="btn" id="btnLerXml">OK - Preencher dados do XML</button>
+
+    <div class="form-grid">
+      <label>Cliente<input name="cliente" required></label>
+      <label>CPF/CNPJ<input name="cpf_cnpj"></label>
+      <label>Cidade<input name="cidade"></label>
+      <label>Endereço<input name="endereco"></label>
+      <label>NF<input name="nf"></label>
+      <label>CT-e / CTR<input name="cte_ctr"></label>
+      <label>Chave NF-e<input name="chave_nfe"></label>
+      <label>Valor NF<input name="valor_nf"></label>
+      <label>Data solicitada<input type="date" name="data_solicitada"></label>
+      <label>Data agendada<input type="date" name="data_agendada"></label>
+      <label>Status
+        <select name="status">
+          {% for s in agendamento_status %}
+          <option value="{{s}}">{{s}}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <label>Observação<textarea name="observacao" rows="3"></textarea></label>
+    <button class="btn primary">Salvar agendamento</button>
+  </form>
+
+  <div class="panel">
+    <h2>Resumo de status</h2>
+    <div class="chart-list">
+      {% for item in por_status %}
+      <div><span>{{ item.label }}</span><b>{{ item.total }}</b></div>
+      {% else %}
+      <p class="muted">Sem dados ainda.</p>
+      {% endfor %}
+    </div>
+    <p class="muted">Atrasado = data agendada anterior a hoje e status diferente de Finalizado.</p>
+  </div>
+</section>
+
+<form class="search-row" method="get">
+  <input name="q" value="{{ q }}" placeholder="Buscar agendamento por cliente, cidade, NF, CT-e ou status">
+  <button>Buscar</button>
+  <a class="btn" href="{{ url_for('agendamentos') }}">Limpar</a>
+</form>
+
+<div class="panel">
+  <table class="table big">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Cliente</th>
+        <th>CPF/CNPJ</th>
+        <th>Cidade</th>
+        <th>NF</th>
+        <th>CT-e</th>
+        <th>Solicitada</th>
+        <th>Agendada</th>
+        <th>Status</th>
+        <th>Atualizar</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for a in rows %}
+      <tr>
+        <td>{{ a.codigo }}</td>
+        <td>{{ a.cliente }}</td>
+        <td>{{ a.cpf_cnpj or '-' }}</td>
+        <td>{{ a.cidade or '-' }}</td>
+        <td>{{ a.nf or '-' }}</td>
+        <td>{{ a.cte_ctr or '-' }}</td>
+        <td>{{ a.data_solicitada or '-' }}</td>
+        <td>{{ a.data_agendada or '-' }}</td>
+        <td><span class="badge {{ a.status|lower|replace(' ', '-') }}">{{ a.status }}</span></td>
+
+        <td>
+          <form method="post" action="{{ url_for('agendamento_status_update', aid=a.id) }}" class="inline-form">
+            <select name="status">
+              {% for s in agendamento_status %}
+              <option value="{{s}}" {% if a.status==s %}selected{% endif %}>{{s}}</option>
+              {% endfor %}
+            </select>
+
+            <input type="date" name="data_agendada" value="{{ a.data_agendada or '' }}">
+            <input name="observacao" value="{{ a.observacao or '' }}" placeholder="Obs">
+            <button>Salvar</button>
+          </form>
+        </td>
+
+        <td>
+          <div class="inline-actions">
+            <a class="btn small" href="/agendamentos/{{ a.id }}/editar">✏️ Editar</a>
+
+            <form method="post" action="/agendamentos/{{ a.id }}/excluir" onsubmit="return confirm('Tem certeza que deseja excluir este agendamento?');">
+              <button class="btn small danger" type="submit">🗑️ Excluir</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="11" class="muted">Nenhum agendamento cadastrado.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const btn = document.getElementById("btnLerXml");
+  const xmlInput = document.getElementById("xml_nfe");
+  if (!btn || !xmlInput) return;
+
+  btn.addEventListener("click", async function () {
+    const file = xmlInput.files[0];
+
+    if (!file) {
+      alert("Escolha um XML primeiro.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("xml_nfe", file);
+
+    btn.disabled = true;
+    btn.innerText = "Lendo XML...";
+
+    try {
+      const response = await fetch("/api/ler-xml-nfe", {
+        method: "POST",
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (!result.ok) {
+        alert(result.erro || "Não foi possível ler o XML.");
+        return;
+      }
+
+      const dados = result.dados;
+
+      preencher("cliente", dados.cliente);
+      preencher("cpf_cnpj", dados.cpf_cnpj);
+      preencher("cidade", dados.cidade);
+      preencher("endereco", dados.endereco);
+      preencher("nf", dados.nf);
+      preencher("chave_nfe", dados.chave_nfe);
+      preencher("valor_nf", dados.valor_nf);
+
+      alert("Dados do XML preenchidos com sucesso.");
+
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao ler XML da NF-e.");
+    } finally {
+      btn.disabled = false;
+      btn.innerText = "OK - Preencher dados do XML";
+    }
+  });
+
+  function preencher(nome, valor) {
+    if (!valor) return;
+    const campo = document.querySelector(`[name="${nome}"]`);
+    if (campo) campo.value = valor;
+  }
+});
+</script>
+
+{% endblock %}

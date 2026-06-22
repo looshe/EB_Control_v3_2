@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login - Expresso Batistense</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=29">
+  <style>
+    html, body { margin:0; min-height:100%; }
+    body.login-v23 {
+      min-height:100vh;
+      overflow:auto;
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      color:#fff;
+      background:
+        linear-gradient(180deg, rgba(20,12,84,.74), rgba(0,27,61,.88)),
+        url("{{ url_for('static', filename='img/caminhao.jpeg') }}") center/cover no-repeat fixed;
+    }
+    .v23-page {
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px 14px;
+    }
+    .v23-box { width:min(430px, 94vw); text-align:center; }
+    .v23-logo {
+      width:72px;
+      height:72px;
+      object-fit:contain;
+      background:#fff;
+      border-radius:18px;
+      padding:8px;
+      box-shadow:0 14px 34px rgba(0,0,0,.28);
+      margin:0 auto 10px;
+      display:block;
+    }
+    .v23-title { margin:0; font-size:clamp(26px, 5vw, 38px); line-height:1; font-weight:900; letter-spacing:.5px; }
+    .v23-line { width:76px; height:3px; background:#ffc400; margin:10px auto; border-radius:99px; }
+    .v23-sub { margin:0 0 14px; font-weight:700; font-size:14px; }
+    .v23-card {
+      background:rgba(255,255,255,.98);
+      color:#172234;
+      border-radius:18px;
+      padding:18px 20px 16px;
+      box-shadow:0 22px 60px rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.5);
+    }
+    .v23-card h2 { margin:0 0 4px; color:#002e63; font-size:24px; }
+    .v23-card p { margin:0 0 14px; color:#5d6878; font-size:14px; }
+    .v23-field {
+      height:46px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      border:1px solid #d7e0eb;
+      border-radius:12px;
+      padding:0 12px;
+      margin-bottom:10px;
+      background:#fff;
+    }
+    .v23-field input {
+      flex:1;
+      height:42px;
+      border:0 !important;
+      outline:0 !important;
+      background:transparent !important;
+      font-size:15px;
+      padding:0 !important;
+      min-width:0;
+      color:#172234;
+    }
+    .v23-btn {
+      width:100%;
+      height:46px;
+      border:0;
+      border-radius:12px;
+      cursor:pointer;
+      background:linear-gradient(90deg,#002e63,#004987);
+      color:#fff;
+      font-weight:900;
+      font-size:15px;
+      margin-top:2px;
+    }
+    .v23-btn:hover { filter:brightness(1.08); }
+    .v23-links { display:flex; justify-content:center; gap:16px; margin-top:12px; }
+    .v23-links a { color:#002e63; font-weight:900; text-decoration:none; }
+    .v23-links a:hover { color:#ffc400; }
+    .v23-help { display:block; margin-top:10px; color:#6b7280; font-size:12px; }
+    .v23-foot { margin-top:12px; display:flex; justify-content:space-between; gap:10px; color:#e9efff; font-size:12px; border-top:2px solid #ffc400; padding-top:8px; }
+    .flash { padding:9px 10px; border-radius:10px; background:#fee2e2; color:#991b1b; margin-bottom:10px; font-size:13px; text-align:left; }
+    .flash.ok { background:#dcfce7; color:#166534; }
+    @media (max-height: 620px) {
+      .v23-page { align-items:flex-start; padding-top:10px; padding-bottom:10px; }
+      .v23-logo { width:56px; height:56px; border-radius:14px; margin-bottom:8px; }
+      .v23-title { font-size:26px; }
+      .v23-sub { margin-bottom:10px; font-size:13px; }
+      .v23-card { padding:14px 16px; }
+      .v23-card h2 { font-size:21px; }
+      .v23-card p { margin-bottom:10px; }
+      .v23-foot { display:none; }
+    }
+  </style>
+</head>
+<body class="login-v23">
+  <main class="v23-page">
+    <section class="v23-box">
+      <img class="v23-logo" src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo Expresso Batistense">
+      <h1 class="v23-title">EXPRESSO BATISTENSE</h1>
+      <div class="v23-line"></div>
+      <p class="v23-sub">Sistema de Gestão de Pendências</p>
+
+      <form method="post" class="v23-card" autocomplete="on">
+        <h2>Bem-vindo!</h2>
+        <p>Faça login para acessar o sistema</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for cat,msg in messages %}
+              <div class="flash {{cat}}">{{msg}}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <label class="v23-field"><span>👤</span><input name="usuario" placeholder="Usuário" autocomplete="username" required autofocus></label>
+        <label class="v23-field"><span>🔐</span><input name="senha" type="password" placeholder="Senha" autocomplete="current-password" required></label>
+        <button type="submit" class="v23-btn">Entrar</button>
+        <small class="v23-help">Acesso restrito a usuários cadastrados pelo administrador.</small>
+      </form>
+
+      <footer class="v23-foot"><span>EB Control v3.1</span><span>© {{ now_year }} Expresso Batistense</span></footer>
+    </section>
+  </main>
+</body>
+</html>

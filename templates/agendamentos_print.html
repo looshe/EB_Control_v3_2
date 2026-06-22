@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Imprimir Agendamentos</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      color: #111827;
+      margin: 24px;
+      background: #fff;
+    }
+
+    .topo {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #002e63;
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      color: #002e63;
+    }
+
+    .sub {
+      margin-top: 4px;
+      font-size: 13px;
+      color: #4b5563;
+    }
+
+    .acoes {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      border: 1px solid #d1d5db;
+      background: #f9fafb;
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #111827;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .btn.primary {
+      background: #002e63;
+      color: #fff;
+      border-color: #002e63;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    th {
+      background: #002e63;
+      color: #fff;
+      text-align: left;
+      padding: 7px;
+      border: 1px solid #d1d5db;
+    }
+
+    td {
+      padding: 7px;
+      border: 1px solid #d1d5db;
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    .status {
+      font-weight: bold;
+    }
+
+    .rodape {
+      margin-top: 16px;
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    @media print {
+      body {
+        margin: 10mm;
+      }
+
+      .acoes {
+        display: none;
+      }
+
+      table {
+        font-size: 10px;
+      }
+
+      th, td {
+        padding: 5px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="topo">
+    <div>
+      <h1>Lista de Agendamentos</h1>
+      <div class="sub">
+        Expresso Batistense • Gerado em {{ now }}
+        {% if q %}
+        • Filtro: {{ q }}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="acoes">
+      <button class="btn primary" onclick="window.print()">🖨️ Imprimir</button>
+      <a class="btn" href="{{ url_for('agendamentos') }}">Voltar</a>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Cliente</th>
+        <th>Cidade</th>
+        <th>CPF/CNPJ</th>
+        <th>NF</th>
+        <th>CT-e</th>
+        <th>Solicitada</th>
+        <th>Agendada</th>
+        <th>Status</th>
+        <th>Observação</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for a in rows %}
+      <tr>
+        <td>{{ a.codigo or '-' }}</td>
+        <td>{{ a.cliente or '-' }}</td>
+        <td>{{ a.cidade or '-' }}</td>
+        <td>{{ a.cpf_cnpj or '-' }}</td>
+        <td>{{ a.nf or '-' }}</td>
+        <td>{{ a.cte_ctr or '-' }}</td>
+        <td>{{ a.data_solicitada or '-' }}</td>
+        <td>{{ a.data_agendada or '-' }}</td>
+        <td class="status">{{ a.status or '-' }}</td>
+        <td>{{ a.observacao or '-' }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="10">Nenhum agendamento encontrado.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="rodape">
+    Total de agendamentos: {{ rows|length }}
+  </div>
+
+  <script>
+    window.addEventListener("load", function () {
+      setTimeout(function () {
+        window.print();
+      }, 500);
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Criar usuário - Expresso Batistense</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=23">
+  <style>
+    html, body { margin:0; min-height:100%; }
+    body.login-v23 {
+      min-height:100vh; overflow:auto; font-family:Inter, Segoe UI, Arial, sans-serif; color:#fff;
+      background:linear-gradient(180deg, rgba(20,12,84,.74), rgba(0,27,61,.88)),url("{{ url_for('static', filename='img/caminhao.jpeg') }}") center/cover no-repeat fixed;
+    }
+    .v23-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px 14px}.v23-box{width:min(430px,94vw);text-align:center}.v23-logo{width:62px;height:62px;object-fit:contain;background:#fff;border-radius:16px;padding:8px;box-shadow:0 14px 34px rgba(0,0,0,.28);margin:0 auto 10px;display:block}.v23-title{margin:0;font-size:clamp(24px,5vw,34px);line-height:1;font-weight:900;letter-spacing:.5px}.v23-line{width:76px;height:3px;background:#ffc400;margin:10px auto;border-radius:99px}.v23-sub{margin:0 0 12px;font-weight:700;font-size:14px}.v23-card{background:rgba(255,255,255,.98);color:#172234;border-radius:18px;padding:16px 20px;box-shadow:0 22px 60px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.5)}.v23-card h2{margin:0 0 4px;color:#002e63;font-size:23px}.v23-card p{margin:0 0 12px;color:#5d6878;font-size:14px}.v23-field{height:44px;display:flex;align-items:center;gap:10px;border:1px solid #d7e0eb;border-radius:12px;padding:0 12px;margin-bottom:9px;background:#fff}.v23-field input{flex:1;height:40px;border:0!important;outline:0!important;background:transparent!important;font-size:15px;padding:0!important;min-width:0;color:#172234}.v23-btn{width:100%;height:44px;border:0;border-radius:12px;cursor:pointer;background:linear-gradient(90deg,#002e63,#004987);color:#fff;font-weight:900;font-size:15px;margin-top:2px}.v23-links{display:flex;justify-content:center;gap:16px;margin-top:10px}.v23-links a{color:#002e63;font-weight:900;text-decoration:none}.flash{padding:9px 10px;border-radius:10px;background:#fee2e2;color:#991b1b;margin-bottom:10px;font-size:13px;text-align:left}.flash.ok{background:#dcfce7;color:#166534}.v23-foot{margin-top:10px;color:#e9efff;font-size:12px;border-top:2px solid #ffc400;padding-top:8px}
+    @media(max-height:620px){.v23-page{align-items:flex-start;padding-top:10px}.v23-logo{width:48px;height:48px}.v23-title{font-size:24px}.v23-card{padding:12px 16px}.v23-field{height:40px}.v23-field input{height:36px}.v23-card h2{font-size:20px}.v23-foot{display:none}}
+  </style>
+</head>
+<body class="login-v23">
+  <main class="v23-page">
+    <section class="v23-box">
+      <img class="v23-logo" src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo Expresso Batistense">
+      <h1 class="v23-title">CRIAR USUÁRIO</h1>
+      <div class="v23-line"></div>
+      <p class="v23-sub">Expresso Batistense - Pendências</p>
+
+      <form method="post" class="v23-card" autocomplete="on">
+        <h2>Novo acesso</h2>
+        <p>Preencha os dados para salvar o usuário.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for cat,msg in messages %}
+              <div class="flash {{cat}}">{{msg}}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <label class="v23-field"><span>🪪</span><input name="nome" placeholder="Nome completo" required autofocus></label>
+        <label class="v23-field"><span>👤</span><input name="usuario" placeholder="Usuário" required></label>
+        <label class="v23-field"><span>🔐</span><input name="senha" type="password" placeholder="Senha" required minlength="4"></label>
+        <label class="v23-field"><span>🔐</span><input name="confirmar" type="password" placeholder="Confirmar senha" required minlength="4"></label>
+        <button type="submit" class="v23-btn">Criar usuário</button>
+        <div class="v23-links"><a href="{{ url_for('login') }}">Voltar para login</a></div>
+      </form>
+      <footer class="v23-foot">EB Control v2.3.0</footer>
+    </section>
+  </main>
+</body>
+</html>
