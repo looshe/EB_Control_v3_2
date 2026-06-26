@@ -115,13 +115,27 @@
 <section class="grid-2">
   <div class="panel">
     <h2>Opções cadastradas</h2>
+    <p class="muted">Edite aqui tipos de pendência ou tipos de envolvidos cadastrados com erro de digitação.</p>
     <table class="table">
-      <thead><tr><th>Categoria</th><th>Valor</th></tr></thead>
+      <thead><tr><th>Categoria</th><th>Valor</th><th>Ações</th></tr></thead>
       <tbody>
         {% for t in tipos %}
-        <tr><td>{{ t.categoria }}</td><td>{{ t.valor }}</td></tr>
+        <tr>
+          <td>{{ 'Tipo de pendência' if t.categoria == 'tipo_pendencia' else 'Tipo de envolvido' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('editar_opcao', oid=t.id) }}" class="inline-form">
+              <input name="valor" value="{{ t.valor }}" required>
+              <button class="btn small" type="submit">Salvar</button>
+            </form>
+          </td>
+          <td>
+            <form method="post" action="{{ url_for('excluir_opcao', oid=t.id) }}" onsubmit="return confirm('Excluir esta opção?');">
+              <button class="btn small danger" type="submit">Excluir</button>
+            </form>
+          </td>
+        </tr>
         {% else %}
-        <tr><td colspan="2" class="muted">Nenhuma opção cadastrada.</td></tr>
+        <tr><td colspan="3" class="muted">Nenhuma opção cadastrada.</td></tr>
         {% endfor %}
       </tbody>
     </table>

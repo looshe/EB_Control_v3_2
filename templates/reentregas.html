@@ -4,55 +4,34 @@
 <div class="page-head">
   <div>
     <h1>Reentregas</h1>
-    <p>Controle de cliente ausente, autorização de reentrega, agendamento com cliente e clientes sem contato.</p>
+    <p>Controle de cliente ausente, autorização, emissão e agendamento de reentregas.</p>
   </div>
 </div>
 
 <section class="cards mini-cards">
-  <a class="card" href="{{ url_for('reentregas', filtro='aguardando_aut') }}">
-    <span>Aguardando autorização</span>
-    <strong>{{ counts.aut }}</strong>
-  </a>
-  <a class="card" href="{{ url_for('reentregas', filtro='aguardando_ag') }}">
-    <span>Pendente agendamento</span>
-    <strong>{{ counts.ag }}</strong>
-  </a>
-  <a class="card alert" href="{{ url_for('reentregas', filtro='sem_contato') }}">
-    <span>Sem contato</span>
-    <strong>{{ counts.sem }}</strong>
-  </a>
-  <a class="card" href="{{ url_for('reentregas') }}">
-    <span>Finalizadas</span>
-    <strong>{{ counts.final }}</strong>
-  </a>
+  <a class="card" href="{{ url_for('reentregas', filtro='aguardando_aut') }}"><span>Aguardando autorização</span><strong>{{ counts.aut }}</strong></a>
+  <a class="card" href="{{ url_for('reentregas', filtro='aguardando_ag') }}"><span>Pendente agendamento</span><strong>{{ counts.ag }}</strong></a>
+  <a class="card alert" href="{{ url_for('reentregas', filtro='sem_contato') }}"><span>Sem contato</span><strong>{{ counts.sem }}</strong></a>
+  <a class="card" href="{{ url_for('reentregas') }}"><span>Finalizadas</span><strong>{{ counts.final }}</strong></a>
 </section>
 
-<section class="grid-2">
+<section class="grid-2 reentrega-top">
   <form method="post" action="{{ url_for('importar_reentregas') }}" enctype="multipart/form-data" class="panel compact-form">
     <h2>Importar relatório SSW</h2>
-    <p class="muted">
-      Envie o CSV/XLSX do SSW. O sistema importa somente ocorrências de reentrega:
-      <b>9</b> destinatário ausente/fechado e <b>38</b> destinatário impossibilitado de receber mercadoria.
-    </p>
-    <p class="muted">
-      Campos lidos automaticamente: destinatário, NF, CT-e/CTR, cidade, UF, CNPJ, código da ocorrência, descrição e data da ocorrência.
-    </p>
-    <label>
-      Arquivo CSV/XLSX
-      <input type="file" name="arquivo" accept=".csv,.xlsx" required>
-    </label>
+    <p class="muted">Importa ocorrências de reentrega do relatório SSW e mantém os registros salvos.</p>
+    <label>Arquivo CSV/XLSX<input type="file" name="arquivo" accept=".csv,.xlsx" required></label>
     <button class="btn primary">Importar relatório</button>
   </form>
 
   <form method="post" class="panel compact-form">
     <h2>Nova reentrega manual</h2>
-    <div class="form-grid">
+    <div class="form-grid compact-grid">
       <label>Cliente<input name="cliente" required></label>
       <label>CPF/CNPJ<input name="cpf_cnpj"></label>
       <label>Cidade<input name="cidade"></label>
       <label>NF<input name="nf"></label>
       <label>CT-e/CTR<input name="cte_ctr"></label>
-      <label>Telefone/WhatsApp<input name="telefone"></label>
+      <label>Telefone<input name="telefone"></label>
       <label>Motivo<input name="motivo" value="Cliente ausente"></label>
       <label>Data ocorrência<input type="date" name="data_ocorrencia"></label>
     </div>
@@ -61,80 +40,79 @@
   </form>
 </section>
 
-<form class="search-row" method="get">
+<form class="search-row compact-search" method="get">
   <input name="q" value="{{ q }}" placeholder="Buscar por cliente, CPF/CNPJ, NF, CT-e, cidade, motivo...">
   <button>Buscar</button>
   <a class="btn" href="{{ url_for('reentregas') }}">Limpar</a>
 </form>
 
-<form method="post" action="{{ url_for('whatsapp_reentregas') }}" class="panel action-panel">
-  <button class="btn primary">📲 Enviar autorização para Jonas/contato cadastrado</button>
-  <small class="muted">Selecione as reentregas abaixo antes de clicar.</small>
-</form>
+<div class="reentrega-actions-row">
+  <form method="post" action="{{ url_for('whatsapp_reentregas') }}" class="panel action-panel compact-action">
+    <button class="btn primary">📲 Solicitar autorização</button>
+    <small class="muted">Selecione reentregas abaixo.</small>
+  </form>
 
-<form method="post" action="{{ url_for('whatsapp_sem_contato') }}" class="panel action-panel">
-  <button class="btn">📲 Solicitar contato ao SAC Ortobom</button>
-  <small class="muted">Selecione clientes sem telefone para montar a mensagem automaticamente.</small>
-</form>
+  <form method="post" action="{{ url_for('whatsapp_sem_contato') }}" class="panel action-panel compact-action">
+    <button class="btn">📲 Solicitar contato SAC Ortobom</button>
+    <small class="muted">Selecione clientes sem telefone.</small>
+  </form>
+</div>
 
-<div class="panel">
-  <table class="table big">
+<div class="panel panel-compact reentregas-panel">
+  <table class="table big reentregas-fit-table">
     <thead>
       <tr>
-        <th></th>
-        <th>Código</th>
-        <th>Cliente</th>
-        <th>CPF/CNPJ</th>
-        <th>Cidade</th>
-        <th>NF</th>
-        <th>CT-e</th>
-        <th>Motivo</th>
-        <th>Telefone</th>
-        <th>Autorização</th>
-        <th>Agendamento</th>
-        <th>Data ocorrência</th>
-        <th>Data reentrega</th>
-        <th>Atualizar</th>
+        <th class="r-check"></th>
+        <th class="r-status">Autorização</th>
+        <th class="r-status">Agendamento</th>
+        <th class="r-code">Código</th>
+        <th class="r-client">Cliente</th>
+        <th class="r-city">Cidade</th>
+        <th class="r-doc">NF</th>
+        <th class="r-doc">CT-e</th>
+        <th class="r-motivo">Motivo</th>
+        <th class="r-phone">Telefone</th>
+        <th class="r-date">Ocorr.</th>
+        <th class="r-date">Reent.</th>
+        <th class="r-update">Atualizar</th>
       </tr>
     </thead>
     <tbody>
       {% for r in rows %}
       <tr>
-        <td><input type="checkbox" name="ids" value="{{ r.id }}" form="bulk-actions"></td>
-        <td>{{ r.codigo }}</td>
-        <td>{{ r.cliente }}</td>
-        <td>{{ r.cpf_cnpj or '-' }}</td>
-        <td>{{ r.cidade or '-' }}</td>
-        <td>{{ r.nf or '-' }}</td>
-        <td>{{ r.cte_ctr or '-' }}</td>
-        <td>{{ r.motivo or '-' }}</td>
-        <td>{{ r.telefone or 'Sem contato' }}</td>
-        <td><span class="badge">{{ r.status_autorizacao }}</span></td>
-        <td><span class="badge">{{ r.status_agendamento }}</span></td>
-        <td>{{ r.data_ocorrencia or '-' }}</td>
-        <td>{{ r.data_reentrega or '-' }}</td>
-        <td>
-          <form method="post" action="{{ url_for('atualizar_reentrega') }}" class="inline-form">
+        <td class="r-check"><input type="checkbox" name="ids" value="{{ r.id }}" form="bulk-actions"></td>
+        <td class="r-status"><span class="badge reen-aut-{{ r.status_autorizacao|lower|replace(' ', '-')|replace('ç','c')|replace('ã','a') }}">{{ r.status_autorizacao }}</span></td>
+        <td class="r-status"><span class="badge reen-ag-{{ r.status_agendamento|lower|replace(' ', '-') }}">{{ r.status_agendamento }}</span></td>
+        <td class="r-code">{{ r.codigo }}</td>
+        <td class="r-client text-cut" title="{{ r.cliente }}">{{ r.cliente }}</td>
+        <td class="r-city text-cut" title="{{ r.cidade or '-' }}">{{ r.cidade or '-' }}</td>
+        <td class="r-doc text-cut">{{ r.nf or '-' }}</td>
+        <td class="r-doc text-cut">{{ r.cte_ctr or '-' }}</td>
+        <td class="r-motivo text-cut" title="{{ r.motivo or '-' }}">{{ r.motivo or '-' }}</td>
+        <td class="r-phone text-cut" title="{{ r.telefone or 'Sem contato' }}">{{ r.telefone or 'Sem contato' }}</td>
+        <td class="r-date">{{ r.data_ocorrencia or '-' }}</td>
+        <td class="r-date">{{ r.data_reentrega or '-' }}</td>
+        <td class="r-update">
+          <form method="post" action="{{ url_for('atualizar_reentrega') }}" class="inline-form reentrega-inline-form">
             <input type="hidden" name="id" value="{{ r.id }}">
             <select name="status_autorizacao">
-              {% for s in reentrega_aut_status %}
-              <option value="{{s}}" {% if r.status_autorizacao==s %}selected{% endif %}>{{s}}</option>
-              {% endfor %}
+              {% for s in reentrega_aut_status %}<option value="{{s}}" {% if r.status_autorizacao==s %}selected{% endif %}>{{s}}</option>{% endfor %}
             </select>
             <select name="status_agendamento">
-              {% for s in reentrega_ag_status %}
-              <option value="{{s}}" {% if r.status_agendamento==s %}selected{% endif %}>{{s}}</option>
-              {% endfor %}
+              {% for s in reentrega_ag_status %}<option value="{{s}}" {% if r.status_agendamento==s %}selected{% endif %}>{{s}}</option>{% endfor %}
             </select>
             <input name="telefone" value="{{ r.telefone or '' }}" placeholder="Telefone">
             <input type="date" name="data_reentrega" value="{{ r.data_reentrega or '' }}">
             <input name="observacao" value="{{ r.observacao or '' }}" placeholder="Obs">
             <button>Salvar</button>
           </form>
+          <form method="post" action="{{ url_for('excluir_reentrega', rid=r.id) }}" class="inline-delete" onsubmit="return confirm('Excluir esta reentrega?');">
+            <button class="icon-btn danger" title="Excluir">🗑️</button>
+          </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="14" class="muted">Nenhuma reentrega encontrada.</td></tr>
+      <tr><td colspan="13" class="muted">Nenhuma reentrega encontrada.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -146,12 +124,9 @@
 for (const form of document.querySelectorAll('.action-panel')) {
   form.addEventListener('submit', function(){
     this.querySelectorAll('input[name="ids"]').forEach(x => x.remove());
-
     document.querySelectorAll('table input[name="ids"]:checked').forEach(cb => {
       const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'ids';
-      input.value = cb.value;
+      input.type = 'hidden'; input.name = 'ids'; input.value = cb.value;
       this.appendChild(input);
     });
   });

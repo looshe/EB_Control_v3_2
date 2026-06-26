@@ -1,6 +1,126 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="page-head"><div><h1>{{ titulo }}</h1><p>Consulta, filtros e edição das ocorrências.</p></div><a class="btn primary" href="{{ url_for('nova_pendencia') }}">+ Anotar</a></div>
-<form class="search-row" method="get"><input name="q" value="{{ q }}" placeholder="Buscar por NF, CT-e, cliente, cidade, motorista, ajudante..."><button>Buscar</button></form>
-<div class="panel"><table class="table big"><thead><tr><th>Código</th><th>Data</th><th>Cliente</th><th>Cidade</th><th>Filial</th><th>NF</th><th>CT-e/CTR</th><th>Tipo</th><th>Criticidade</th><th>Envolvidos</th><th>Status</th><th>Resolução</th><th>Dias</th><th></th></tr></thead><tbody>{% for p in pendencias %}<tr><td><a href="{{ url_for('detalhe_pendencia', pid=p.id) }}">{{ p.codigo }}</a></td><td>{{ p.data_abertura }}</td><td>{{ p.cliente or '-' }}</td><td>{{ p.cidade or '-' }}</td><td><span class="pill">{{ p.filial_responsavel or '-' }}</span></td><td>{{ p.nf or '-' }}</td><td>{{ p.cte_ctr or '-' }}</td><td>{{ p.tipo or '-' }}</td><td><span class="pill crit-{{ p.criticidade|lower|replace('í','i') }}">{{ p.criticidade }}</span></td><td>{{ p.id|envolvidos_preview }}</td><td><span class="badge {{ p.status|lower|replace(' ', '-') }}">{{ p.status }}</span></td><td>{{ p.data_resolucao or '-' }}</td><td>{{ p|dias_aberto }}</td><td><a class="icon-btn" href="{{ url_for('editar_pendencia', pid=p.id) }}">✏️</a></td></tr>{% else %}<tr><td colspan="14" class="muted">Nenhuma pendência encontrada.</td></tr>{% endfor %}</tbody></table></div>
+
+<div class="page-head">
+  <div>
+    <h1>{{ titulo }}</h1>
+    <p>Consulta, filtros e edição das ocorrências. As pendências abertas aparecem primeiro.</p>
+  </div>
+
+  <a class="btn primary" href="{{ url_for('nova_pendencia') }}">+ Anotar</a>
+</div>
+
+<form class="search-row" method="get">
+  <input name="q" value="{{ q }}" placeholder="Buscar por NF, cliente, remetente, destinatário, cidade, motorista, ajudante...">
+  <button>Buscar</button>
+  <a class="btn" href="{{ url_for('pendencias') }}">Limpar</a>
+</form>
+
+<div class="panel report-filter-panel">
+  <h2>Impressão e CSV das pendências</h2>
+  <p class="muted">Use estes filtros apenas para imprimir ou exportar. A listagem acima continua funcionando normalmente.</p>
+
+  <form class="report-filter-grid" method="get">
+    <label>Período
+      <select name="periodo">
+        <option value="mes">Mês escolhido</option>
+        <option value="30">Últimos 30 dias</option>
+        <option value="personalizado">Período personalizado</option>
+      </select>
+    </label>
+
+    <label>Mês
+      <input type="month" name="mes" value="{{ now_year }}-{{ '%02d'|format(1) }}" onfocus="if(!this.value){ const d=new Date(); this.value=d.toISOString().slice(0,7); }">
+    </label>
+
+    <label>De
+      <input type="date" name="data_ini">
+    </label>
+
+    <label>Até
+      <input type="date" name="data_fim">
+    </label>
+
+    <label>Tipo
+      <select name="tipo">
+        <option value="">Todos</option>
+        {% for t in tipos %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+    </label>
+
+    <label>Envolvido
+      <input name="envolvido" list="nomes" placeholder="Motorista, ajudante, conferente...">
+    </label>
+
+    <label>Status
+      <select name="status">
+        <option value="">Todos</option>
+        {% for s in status_list %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+      </select>
+    </label>
+
+    <label>Filial
+      <select name="filial">
+        <option value="">Todas</option>
+        {% for f in filiais_list %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+      </select>
+    </label>
+
+    <div class="report-actions">
+      <button class="btn primary" formaction="{{ url_for('pendencias_imprimir') }}" formtarget="_blank">🖨️ Imprimir</button>
+      <button class="btn" formaction="{{ url_for('pendencias_exportar_csv') }}">📄 Exportar CSV</button>
+    </div>
+  </form>
+</div>
+
+<div class="panel compact-table-panel">
+  <table class="table big compact-pendencias-table">
+    <thead>
+      <tr>
+        <th>Ações</th>
+        <th>Data</th>
+        <th>NF</th>
+        <th>Remetente</th>
+        <th>Destinatário</th>
+        <th>Cidade</th>
+        <th>Filial</th>
+        <th>Tipo</th>
+        <th>Crit.</th>
+        <th>Envolvidos</th>
+        <th>Status</th>
+        <th>Resol.</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for p in pendencias %}
+      <tr>
+        <td class="col-actions">
+          <div class="inline-actions compact-actions">
+            <a class="icon-btn" href="{{ url_for('detalhe_pendencia', pid=p.id) }}" title="Ver">👁️</a>
+            <a class="icon-btn" href="{{ url_for('editar_pendencia', pid=p.id) }}" title="Editar">✏️</a>
+            <form method="post" action="{{ url_for('excluir_pendencia', pid=p.id) }}" style="display:inline;" onsubmit="return confirm('Deseja realmente excluir esta pendência? Esta ação não pode ser desfeita.');">
+              <button class="icon-btn danger" type="submit" title="Excluir">🗑️</button>
+            </form>
+          </div>
+        </td>
+        <td>{{ p.data_abertura }}</td>
+        <td>{{ p.nf or '-' }}</td>
+        <td class="text-compact">{{ p.remetente if p.remetente is defined and p.remetente else '-' }}</td>
+        <td class="text-compact">{{ p.destinatario if p.destinatario is defined and p.destinatario else (p.cliente or '-') }}</td>
+        <td>{{ p.cidade or '-' }}</td>
+        <td><span class="pill">{{ p.filial_responsavel or '-' }}</span></td>
+        <td>{{ p.tipo or '-' }}</td>
+        <td><span class="pill crit-{{ p.criticidade|lower|replace('í','i') }}">{{ p.criticidade }}</span></td>
+        <td class="text-compact">{{ p.id|envolvidos_preview }}</td>
+        <td><span class="badge {{ p.status|lower|replace(' ', '-') }}">{{ p.status }}</span></td>
+        <td>{{ p.data_resolucao[:10] if p.data_resolucao else '-' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="12" class="muted">Nenhuma pendência encontrada.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 {% endblock %}

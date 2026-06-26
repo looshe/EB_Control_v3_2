@@ -37,7 +37,7 @@ TIPOS_PADRAO = [
 TIPOS_ENVOLVIDO_PADRAO = ["Motorista", "Ajudante", "Conferente", "Filial", "Comercial", "Cliente", "Outro"]
 FILIAIS_LIST = ["SJB", "NHO", "CRI", "OUT", "HBG"]
 AGENDAMENTO_STATUS = ["Pendente", "Agendado", "Finalizado"]
-REENTREGA_AUT_STATUS = ["Aguardando autorização", "Autorizada", "Negada"]
+REENTREGA_AUT_STATUS = ["Aguardando autorização", "Autorizada", "Negada", "Emitido"]
 REENTREGA_AG_STATUS = ["Pendente com cliente", "Agendado", "Finalizado"]
 DEFAULT_ADMIN_USER = "admin"
 DEFAULT_ADMIN_PASSWORD = os.environ.get("EB_ADMIN_PASSWORD", "EB@Admin2026!")
@@ -111,6 +111,8 @@ def init_db() -> None:
             codigo TEXT UNIQUE,
             data_abertura TEXT NOT NULL,
             data_resolucao TEXT,
+            remetente TEXT,
+            destinatario TEXT,
             cliente TEXT,
             cliente_norm TEXT,
             cidade TEXT,
@@ -155,6 +157,15 @@ def init_db() -> None:
             usuario_id INTEGER,
             acao TEXT NOT NULL,
             detalhes TEXT,
+            criado_em TEXT NOT NULL,
+            FOREIGN KEY(pendencia_id) REFERENCES pendencias(id) ON DELETE CASCADE,
+            FOREIGN KEY(usuario_id) REFERENCES usuarios(id)
+        );
+        CREATE TABLE IF NOT EXISTS tratativas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pendencia_id INTEGER NOT NULL,
+            usuario_id INTEGER,
+            texto TEXT NOT NULL,
             criado_em TEXT NOT NULL,
             FOREIGN KEY(pendencia_id) REFERENCES pendencias(id) ON DELETE CASCADE,
             FOREIGN KEY(usuario_id) REFERENCES usuarios(id)
@@ -228,6 +239,8 @@ def init_db() -> None:
     for table, columns in {
         'pendencias': [
             ('filial_responsavel', "TEXT DEFAULT 'SJB'"),
+            ('remetente', 'TEXT'),
+            ('destinatario', 'TEXT'),
             ('cpf_cnpj', 'TEXT'),
             ('endereco', 'TEXT'),
             ('chave_nfe', 'TEXT'),
@@ -360,6 +373,95 @@ def get_cadastros(categoria: str) -> list[str]:
     return [r["valor"] for r in db().execute("SELECT valor FROM cadastros WHERE categoria=? ORDER BY valor", (categoria,)).fetchall()]
 
 
+def get_envolvidos_texto(pendencia_id: int) -> str:
+    ev = db().execute("SELECT tipo, nome FROM envolvidos WHERE pendencia_id=? ORDER BY id", (pendencia_id,)).fetchall()
+    if not ev:
+        return "-"
+    return " | ".join([f"{e['tipo']}: {e['nome']}" for e in ev])
+
+
+def ultima_tratativa_texto(pendencia_id: int) -> str:
+    row = db().execute("SELECT texto FROM tratativas WHERE pendencia_id=? ORDER BY id DESC LIMIT 1", (pendencia_id,)).fetchone()
+    return row["texto"] if row else ""
+
+
+def resumo_texto(value: str | None, limite: int = 90) -> str:
+    texto = " ".join((value or "").split())
+    if len(texto) <= limite:
+        return texto
+    return texto[:limite - 3].rstrip() + "..."
+
+
+def dias_aberto_valor(p: sqlite3.Row) -> int | str:
+    try:
+        d0 = datetime.fromisoformat((p["data_abertura"] or "")[:10])
+        d1 = datetime.fromisoformat((p["data_resolucao"] or "")[:10]) if p["data_resolucao"] else datetime.now()
+        return max((d1 - d0).days, 0)
+    except Exception:
+        return "-"
+
+
+def pendencias_relatorio_query(args):
+    periodo = args.get("periodo") or "mes"
+    mes = args.get("mes") or datetime.now().strftime("%Y-%m")
+    data_ini = args.get("data_ini") or ""
+    data_fim = args.get("data_fim") or ""
+    tipo = args.get("tipo") or ""
+    envolvido = args.get("envolvido") or ""
+    status = args.get("status") or ""
+    filial = args.get("filial") or ""
+
+    where = []
+    params = []
+
+    if periodo == "30":
+        from datetime import timedelta
+        inicio = (datetime.now() - timedelta(days=30)).date().isoformat()
+        fim = datetime.now().date().isoformat()
+        where.append("substr(p.data_abertura,1,10) BETWEEN ? AND ?")
+        params.extend([inicio, fim])
+        periodo_label = "Últimos 30 dias"
+    elif periodo == "personalizado" and data_ini and data_fim:
+        where.append("substr(p.data_abertura,1,10) BETWEEN ? AND ?")
+        params.extend([data_ini, data_fim])
+        periodo_label = f"{data_ini} até {data_fim}"
+    else:
+        where.append("substr(p.data_abertura,1,7)=?")
+        params.append(mes)
+        periodo_label = mes
+
+    if tipo:
+        where.append("COALESCE(p.tipo,'')=?")
+        params.append(tipo)
+    if status:
+        where.append("COALESCE(p.status,'')=?")
+        params.append(status)
+    if filial:
+        where.append("COALESCE(p.filial_responsavel,'')=?")
+        params.append(filial)
+    if envolvido:
+        where.append("EXISTS (SELECT 1 FROM envolvidos e WHERE e.pendencia_id=p.id AND e.nome LIKE ?)")
+        params.append(f"%{envolvido}%")
+
+    sql = "SELECT p.* FROM pendencias p"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY CASE p.status WHEN 'Pendente' THEN 1 WHEN 'Em andamento' THEN 2 WHEN 'Resolvido' THEN 3 ELSE 4 END, p.data_abertura DESC, p.id DESC"
+    rows = db().execute(sql, params).fetchall()
+    filtros = {
+        "periodo": periodo,
+        "mes": mes,
+        "data_ini": data_ini,
+        "data_fim": data_fim,
+        "tipo": tipo,
+        "envolvido": envolvido,
+        "status": status,
+        "filial": filial,
+        "periodo_label": periodo_label,
+    }
+    return rows, filtros
+
+
 def fetch_pendencia(pid: int) -> sqlite3.Row:
     row = db().execute("SELECT * FROM pendencias WHERE id=?", (pid,)).fetchone()
     if not row:
@@ -412,9 +514,13 @@ def pendencia_payload() -> dict[str, Any]:
     criticidade = request.form.get("criticidade") or "Normal"
     if criticidade not in CRITICIDADE_LIST:
         criticidade = "Normal"
+    destinatario = proper_name(request.form.get("destinatario") or request.form.get("cliente"))
+    remetente = proper_name(request.form.get("remetente"))
     return {
         "data_abertura": request.form.get("data_abertura") or today_str(),
-        "cliente": proper_name(request.form.get("cliente")),
+        "remetente": remetente,
+        "destinatario": destinatario,
+        "cliente": destinatario,
         "cidade": proper_name(request.form.get("cidade")),
         "filial_responsavel": (request.form.get("filial_responsavel") or "SJB").strip().upper(),
         "cpf_cnpj": (request.form.get("cpf_cnpj") or "").strip(),
@@ -494,12 +600,12 @@ def list_query(status: str | None = None):
         params.append(status)
     if q:
         like = f"%{q}%"
-        where.append("(p.codigo LIKE ? OR p.cliente LIKE ? OR p.cidade LIKE ? OR p.nf LIKE ? OR p.cte_ctr LIKE ? OR p.tipo LIKE ? OR p.filial_responsavel LIKE ? OR EXISTS (SELECT 1 FROM envolvidos e WHERE e.pendencia_id=p.id AND e.nome LIKE ?))")
-        params.extend([like, like, like, like, like, like, like, like])
+        where.append("(p.codigo LIKE ? OR p.cliente LIKE ? OR COALESCE(p.remetente,'') LIKE ? OR COALESCE(p.destinatario,'') LIKE ? OR p.cidade LIKE ? OR p.nf LIKE ? OR p.cte_ctr LIKE ? OR p.tipo LIKE ? OR p.filial_responsavel LIKE ? OR EXISTS (SELECT 1 FROM envolvidos e WHERE e.pendencia_id=p.id AND e.nome LIKE ?))")
+        params.extend([like, like, like, like, like, like, like, like, like, like])
     sql = "SELECT p.* FROM pendencias p"
     if where:
         sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY p.id DESC"
+    sql += " ORDER BY CASE p.status WHEN 'Pendente' THEN 1 WHEN 'Em andamento' THEN 2 WHEN 'Resolvido' THEN 3 ELSE 4 END, p.id DESC"
     rows = db().execute(sql, params).fetchall()
     return rows, q
 
@@ -511,7 +617,9 @@ def pendencias():
     if status not in STATUS_LIST:
         status = None
     rows, q = list_query(status)
-    return render_template("pendencias.html", pendencias=rows, q=q, status_atual=status, titulo=status or "Todas as pendências")
+    tipos = get_options("tipo_pendencia")
+    nomes = get_cadastros("envolvido")
+    return render_template("pendencias.html", pendencias=rows, q=q, status_atual=status, titulo=status or "Todas as pendências", tipos=tipos, nomes=nomes)
 
 
 @app.route("/pendencia/nova", methods=["GET", "POST"])
@@ -520,18 +628,20 @@ def nova_pendencia():
     if request.method == "POST":
         data = pendencia_payload()
         xml_data = parse_nfe_xml_storage(request.files.get("xml_nfe"))
-        for key in ["cliente", "cpf_cnpj", "cidade", "endereco", "nf", "chave_nfe", "valor_nf"]:
+        for key in ["remetente", "destinatario", "cliente", "cpf_cnpj", "cidade", "endereco", "nf", "chave_nfe", "valor_nf"]:
             if xml_data.get(key) and not data.get(key):
                 data[key] = xml_data[key]
+        if data.get("destinatario"):
+            data["cliente"] = data["destinatario"]
         if xml_data.get("data_emissao") and not data.get("data_abertura"):
             data["data_abertura"] = xml_data["data_emissao"]
         data_resolucao = now_str() if data["status"] == "Resolvido" else ""
         cur = execute(
             """
-            INSERT INTO pendencias (data_abertura, data_resolucao, cliente, cliente_norm, cidade, cidade_norm, filial_responsavel, cpf_cnpj, endereco, chave_nfe, valor_nf, nf, cte_ctr, status, tipo, criticidade, descricao, andamento, resolucao, criado_por, atualizado_em)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO pendencias (data_abertura, data_resolucao, remetente, destinatario, cliente, cliente_norm, cidade, cidade_norm, filial_responsavel, cpf_cnpj, endereco, chave_nfe, valor_nf, nf, cte_ctr, status, tipo, criticidade, descricao, andamento, resolucao, criado_por, atualizado_em)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (data["data_abertura"], data_resolucao, data["cliente"], norm(data["cliente"]), data["cidade"], norm(data["cidade"]), data["filial_responsavel"], data["cpf_cnpj"], data["endereco"], data["chave_nfe"], data["valor_nf"], data["nf"], data["cte_ctr"], data["status"], data["tipo"], data["criticidade"], data["descricao"], data["andamento"], data["resolucao"], session.get("user_id"), now_str()),
+            (data["data_abertura"], data_resolucao, data["remetente"], data["destinatario"], data["cliente"], norm(data["cliente"]), data["cidade"], norm(data["cidade"]), data["filial_responsavel"], data["cpf_cnpj"], data["endereco"], data["chave_nfe"], data["valor_nf"], data["nf"], data["cte_ctr"], data["status"], data["tipo"], data["criticidade"], data["descricao"], data["andamento"], data["resolucao"], session.get("user_id"), now_str()),
         )
         pid = cur.lastrowid
         codigo = f"OC-{pid:06d}"
@@ -550,16 +660,78 @@ def nova_pendencia():
         return redirect(url_for("detalhe_pendencia", pid=pid))
     return render_template("form.html", pendencia=None, envolvidos=[], anexos=[], historico=[], tipos=get_options("tipo_pendencia"), tipos_envolvido=get_options("tipo_envolvido"), clientes=get_cadastros("cliente"), cidades=get_cadastros("cidade"), nomes=get_cadastros("envolvido"))
 
+@app.route("/pendencia/<int:pid>/tratativa", methods=["POST"])
+@login_required
+def adicionar_tratativa(pid: int):
+    fetch_pendencia(pid)
+
+    texto = (request.form.get("tratativa") or "").strip()
+
+    if not texto:
+        flash("Digite uma tratativa antes de salvar.", "erro")
+        return redirect(url_for("detalhe_pendencia", pid=pid))
+
+    execute(
+        "INSERT INTO tratativas (pendencia_id, usuario_id, texto, criado_em) VALUES (?, ?, ?, ?)",
+        (pid, session.get("user_id"), texto, now_str()),
+    )
+
+    execute(
+        "UPDATE pendencias SET andamento=?, atualizado_em=? WHERE id=?",
+        (texto, now_str(), pid),
+    )
+
+    log_action(pid, "Tratativa adicionada", texto)
+
+    flash("Tratativa adicionada.", "ok")
+    return redirect(url_for("detalhe_pendencia", pid=pid))
+
 
 @app.route("/pendencia/<int:pid>")
 @login_required
 def detalhe_pendencia(pid: int):
     p = fetch_pendencia(pid)
-    envolvidos = db().execute("SELECT * FROM envolvidos WHERE pendencia_id=? ORDER BY id", (pid,)).fetchall()
-    anexos = db().execute("SELECT * FROM anexos WHERE pendencia_id=? ORDER BY id DESC", (pid,)).fetchall()
-    hist = db().execute("SELECT h.*, u.nome usuario_nome FROM historico h LEFT JOIN usuarios u ON u.id=h.usuario_id WHERE h.pendencia_id=? ORDER BY h.id DESC", (pid,)).fetchall()
-    return render_template("detalhe.html", p=p, envolvidos=envolvidos, anexos=anexos, historico=hist)
 
+    envolvidos = db().execute(
+        "SELECT * FROM envolvidos WHERE pendencia_id=? ORDER BY id",
+        (pid,)
+    ).fetchall()
+
+    anexos = db().execute(
+        "SELECT * FROM anexos WHERE pendencia_id=? ORDER BY id DESC",
+        (pid,)
+    ).fetchall()
+
+    hist = db().execute(
+        """
+        SELECT h.*, u.nome usuario_nome
+        FROM historico h
+        LEFT JOIN usuarios u ON u.id=h.usuario_id
+        WHERE h.pendencia_id=?
+        ORDER BY h.id DESC
+        """,
+        (pid,)
+    ).fetchall()
+
+    tratativas = db().execute(
+        """
+        SELECT t.*, u.nome usuario_nome
+        FROM tratativas t
+        LEFT JOIN usuarios u ON u.id=t.usuario_id
+        WHERE t.pendencia_id=?
+        ORDER BY t.id DESC
+        """,
+        (pid,)
+    ).fetchall()
+
+    return render_template(
+        "detalhe.html",
+        p=p,
+        envolvidos=envolvidos,
+        anexos=anexos,
+        historico=hist,
+        tratativas=tratativas
+    )
 
 @app.route("/pendencia/<int:pid>/editar", methods=["GET", "POST"])
 @login_required
@@ -568,9 +740,11 @@ def editar_pendencia(pid: int):
     if request.method == "POST":
         data = pendencia_payload()
         xml_data = parse_nfe_xml_storage(request.files.get("xml_nfe"))
-        for key in ["cliente", "cpf_cnpj", "cidade", "endereco", "nf", "chave_nfe", "valor_nf"]:
+        for key in ["remetente", "destinatario", "cliente", "cpf_cnpj", "cidade", "endereco", "nf", "chave_nfe", "valor_nf"]:
             if xml_data.get(key):
                 data[key] = xml_data[key]
+        if data.get("destinatario"):
+            data["cliente"] = data["destinatario"]
         old_status = p["status"]
         data_resolucao = p["data_resolucao"]
         if data["status"] == "Resolvido" and old_status != "Resolvido":
@@ -579,9 +753,9 @@ def editar_pendencia(pid: int):
             data_resolucao = ""
         execute(
             """
-            UPDATE pendencias SET data_abertura=?, data_resolucao=?, cliente=?, cliente_norm=?, cidade=?, cidade_norm=?, filial_responsavel=?, cpf_cnpj=?, endereco=?, chave_nfe=?, valor_nf=?, nf=?, cte_ctr=?, status=?, tipo=?, criticidade=?, descricao=?, andamento=?, resolucao=?, atualizado_em=? WHERE id=?
+            UPDATE pendencias SET data_abertura=?, data_resolucao=?, remetente=?, destinatario=?, cliente=?, cliente_norm=?, cidade=?, cidade_norm=?, filial_responsavel=?, cpf_cnpj=?, endereco=?, chave_nfe=?, valor_nf=?, nf=?, cte_ctr=?, status=?, tipo=?, criticidade=?, descricao=?, andamento=?, resolucao=?, atualizado_em=? WHERE id=?
             """,
-            (data["data_abertura"], data_resolucao, data["cliente"], norm(data["cliente"]), data["cidade"], norm(data["cidade"]), data["filial_responsavel"], data["cpf_cnpj"], data["endereco"], data["chave_nfe"], data["valor_nf"], data["nf"], data["cte_ctr"], data["status"], data["tipo"], data["criticidade"], data["descricao"], data["andamento"], data["resolucao"], now_str(), pid),
+            (data["data_abertura"], data_resolucao, data["remetente"], data["destinatario"], data["cliente"], norm(data["cliente"]), data["cidade"], norm(data["cidade"]), data["filial_responsavel"], data["cpf_cnpj"], data["endereco"], data["chave_nfe"], data["valor_nf"], data["nf"], data["cte_ctr"], data["status"], data["tipo"], data["criticidade"], data["descricao"], data["andamento"], data["resolucao"], now_str(), pid),
         )
         add_cadastro("cliente", data["cliente"])
         add_cadastro("cidade", data["cidade"])
@@ -597,7 +771,26 @@ def editar_pendencia(pid: int):
     hist = db().execute("SELECT h.*, u.nome usuario_nome FROM historico h LEFT JOIN usuarios u ON u.id=h.usuario_id WHERE h.pendencia_id=? ORDER BY h.id DESC", (pid,)).fetchall()
     return render_template("form.html", pendencia=p, envolvidos=envolvidos, anexos=anexos, historico=hist, tipos=get_options("tipo_pendencia"), tipos_envolvido=get_options("tipo_envolvido"), clientes=get_cadastros("cliente"), cidades=get_cadastros("cidade"), nomes=get_cadastros("envolvido"))
 
+@app.route("/pendencia/<int:pid>/excluir", methods=["POST"])
+@login_required
+def excluir_pendencia(pid):
+    try:
+        fetch_pendencia(pid)
 
+        execute("DELETE FROM envolvidos WHERE pendencia_id=?", (pid,))
+        execute("DELETE FROM anexos WHERE pendencia_id=?", (pid,))
+        execute("DELETE FROM historico WHERE pendencia_id=?", (pid,))
+        execute("DELETE FROM tratativas WHERE pendencia_id=?", (pid,))
+        execute("DELETE FROM pendencias WHERE id=?", (pid,))
+
+        log_action(None, "Pendência excluída", f"ID {pid}")
+
+        flash("Pendência excluída com sucesso.", "ok")
+
+    except Exception:
+        flash("Pendência não encontrada.", "erro")
+
+    return redirect(url_for("pendencias"))
 @app.route("/uploads/<int:pid>/<path:filename>")
 @login_required
 def download_anexo(pid: int, filename: str):
@@ -633,6 +826,35 @@ def cadastros():
     usuarios = db().execute("SELECT * FROM usuarios ORDER BY nome").fetchall()
     contatos = db().execute("SELECT * FROM contatos ORDER BY funcao, nome").fetchall()
     return render_template("cadastros.html", tipos=tipos, usuarios=usuarios, contatos=contatos)
+
+
+@app.route("/opcoes/<int:oid>/editar", methods=["POST"])
+@login_required
+@admin_required
+def editar_opcao(oid: int):
+    valor = proper_name(request.form.get("valor"))
+    if not valor:
+        flash("Informe um nome válido para a opção.", "erro")
+        return redirect(url_for("cadastros"))
+    row = db().execute("SELECT * FROM opcoes WHERE id=?", (oid,)).fetchone()
+    if not row:
+        flash("Opção não encontrada.", "erro")
+        return redirect(url_for("cadastros"))
+    try:
+        execute("UPDATE opcoes SET valor=?, valor_norm=? WHERE id=?", (valor, norm(valor), oid))
+        flash("Opção atualizada.", "ok")
+    except sqlite3.IntegrityError:
+        flash("Já existe uma opção com esse nome.", "erro")
+    return redirect(url_for("cadastros"))
+
+
+@app.route("/opcoes/<int:oid>/excluir", methods=["POST"])
+@login_required
+@admin_required
+def excluir_opcao(oid: int):
+    execute("DELETE FROM opcoes WHERE id=?", (oid,))
+    flash("Opção excluída.", "ok")
+    return redirect(url_for("cadastros"))
 
 
 @app.route("/usuarios")
@@ -752,6 +974,65 @@ def excluir_usuario(uid: int):
     execute("DELETE FROM usuarios WHERE id=?", (uid,))
     flash("Usuário excluído.", "ok")
     return admin_return()
+
+
+@app.route("/pendencias/imprimir")
+@login_required
+def pendencias_imprimir():
+    rows, filtros = pendencias_relatorio_query(request.args)
+    counts = {
+        "total": len(rows),
+        "pendente": len([p for p in rows if p["status"] == "Pendente"]),
+        "andamento": len([p for p in rows if p["status"] == "Em andamento"]),
+        "resolvido": len([p for p in rows if p["status"] == "Resolvido"]),
+    }
+    return render_template(
+        "pendencias_print.html",
+        pendencias=rows,
+        filtros=filtros,
+        counts=counts,
+        gerado_em=now_str(),
+    )
+
+
+@app.route("/pendencias/exportar-csv")
+@login_required
+def pendencias_exportar_csv():
+    rows, filtros = pendencias_relatorio_query(request.args)
+    header = [
+        "data", "nf", "remetente", "destinatario", "cidade", "filial",
+        "tipo", "criticidade", "descricao", "envolvidos", "status",
+        "resolucao", "dias_aberto", "ultima_tratativa"
+    ]
+
+    def generate():
+        buffer = io.StringIO()
+        writer = csv.writer(buffer, delimiter=";")
+        writer.writerow(header)
+        yield "﻿" + buffer.getvalue()
+        for p in rows:
+            buffer.seek(0)
+            buffer.truncate(0)
+            writer.writerow([
+                p["data_abertura"],
+                p["nf"] or "",
+                p["remetente"] or "",
+                p["destinatario"] or p["cliente"] or "",
+                p["cidade"] or "",
+                p["filial_responsavel"] or "",
+                p["tipo"] or "",
+                p["criticidade"] or "",
+                p["descricao"] or "",
+                get_envolvidos_texto(p["id"]),
+                p["status"] or "",
+                p["data_resolucao"] or "",
+                dias_aberto_valor(p),
+                ultima_tratativa_texto(p["id"]),
+            ])
+            yield buffer.getvalue()
+
+    nome = "pendencias_filtradas.csv"
+    return Response(generate(), mimetype="text/csv; charset=utf-8", headers={"Content-Disposition": f"attachment; filename={nome}"})
 
 
 @app.route("/historico")
@@ -952,6 +1233,7 @@ def parse_nfe_xml_storage(file) -> dict[str, str]:
         return ""
 
     ide = child(inf, "ide")
+    emit = child(inf, "emit")
     dest = child(inf, "dest")
     ender = child(dest, "enderDest")
     total = child(inf, "total")
@@ -970,6 +1252,8 @@ def parse_nfe_xml_storage(file) -> dict[str, str]:
         "nf": text(ide, "nNF"),
         "chave_nfe": chave,
         "data_emissao": emissao,
+        "remetente": proper_name(text(emit, "xNome")),
+        "destinatario": proper_name(text(dest, "xNome")),
         "cliente": proper_name(text(dest, "xNome")),
         "cpf_cnpj": text(dest, "CNPJ") or text(dest, "CPF"),
         "cidade": proper_name(cidade_final),
@@ -1105,6 +1389,52 @@ def agendamentos_imprimir():
     return render_template("agendamentos_print.html", rows=rows, q=q, now=now_str())
 
 
+@app.route("/agendamentos/<int:aid>/editar", methods=["GET", "POST"])
+@login_required
+def editar_agendamento(aid: int):
+    ag = db().execute("SELECT * FROM agendamentos WHERE id=?", (aid,)).fetchone()
+
+    if not ag:
+        flash("Agendamento não encontrado.", "erro")
+        return redirect(url_for("agendamentos"))
+
+    if request.method == "POST":
+        cliente = proper_name(request.form.get("cliente"))
+        cidade = proper_name(request.form.get("cidade"))
+        cpf_cnpj = (request.form.get("cpf_cnpj") or "").strip()
+        endereco = proper_name(request.form.get("endereco"))
+        chave_nfe = (request.form.get("chave_nfe") or "").strip()
+        valor_nf = (request.form.get("valor_nf") or "").strip()
+        nf = (request.form.get("nf") or "").strip()
+        cte = (request.form.get("cte_ctr") or "").strip()
+        data_solicitada = request.form.get("data_solicitada") or ""
+        data_agendada = request.form.get("data_agendada") or ""
+        status = request.form.get("status") or "Pendente"
+        observacao = request.form.get("observacao") or ""
+
+        if status not in AGENDAMENTO_STATUS:
+            status = "Pendente"
+
+        execute(
+            """
+            UPDATE agendamentos
+            SET cliente=?, cidade=?, cpf_cnpj=?, endereco=?, chave_nfe=?, valor_nf=?, nf=?, cte_ctr=?,
+                data_solicitada=?, data_agendada=?, status=?, observacao=?, atualizado_em=?
+            WHERE id=?
+            """,
+            (cliente, cidade, cpf_cnpj, endereco, chave_nfe, valor_nf, nf, cte,
+             data_solicitada, data_agendada, status, observacao, now_str(), aid),
+        )
+
+        add_cadastro("cliente", cliente)
+        add_cadastro("cidade", cidade)
+
+        flash("Agendamento atualizado.", "ok")
+        return redirect(url_for("agendamentos_tabela"))
+
+    return render_template("agendamento_form.html", ag=ag, agendamento_status=AGENDAMENTO_STATUS)
+
+
 @app.route("/agendamentos/<int:aid>/excluir", methods=["POST"])
 @login_required
 def excluir_agendamento(aid: int):
@@ -1160,7 +1490,7 @@ def reentregas():
         "sem": db().execute("SELECT COUNT(*) c FROM reentregas WHERE COALESCE(telefone,'')=''").fetchone()["c"],
         "final": db().execute("SELECT COUNT(*) c FROM reentregas WHERE status_agendamento='Finalizado'").fetchone()["c"],
     }
-    return render_template("reentregas.html", rows=rows, q=q, filtro=filtro, counts=counts)
+    return render_template("reentregas.html", rows=rows, q=q, filtro=filtro, counts=counts, reentrega_aut_status=REENTREGA_AUT_STATUS, reentrega_ag_status=REENTREGA_AG_STATUS)
 
 
 @app.route("/reentregas/importar", methods=["POST"])
@@ -1314,6 +1644,20 @@ def atualizar_reentrega():
 
 def contato_por_funcao(funcao: str):
     return db().execute("SELECT * FROM contatos WHERE funcao=? ORDER BY id DESC LIMIT 1", (funcao,)).fetchone()
+
+
+@app.route("/reentregas/<int:rid>/excluir", methods=["POST"])
+@login_required
+def excluir_reentrega(rid: int):
+    re = db().execute("SELECT * FROM reentregas WHERE id=?", (rid,)).fetchone()
+
+    if not re:
+        flash("Reentrega não encontrada.", "erro")
+        return redirect(url_for("reentregas"))
+
+    execute("DELETE FROM reentregas WHERE id=?", (rid,))
+    flash("Reentrega excluída.", "ok")
+    return redirect(url_for("reentregas"))
 
 
 @app.route("/whatsapp/reentregas", methods=["POST"])

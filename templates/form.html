@@ -17,13 +17,15 @@
 
   <div class="xml-box panel">
     <h2>Importar XML da NF-e</h2>
-    <p class="muted">Selecione o XML da NF-e e clique em preencher para puxar automaticamente cliente, CPF/CNPJ, cidade, endereço, NF, chave e valor.</p>
+    <p class="muted">Selecione o XML da NF-e e clique em preencher para puxar automaticamente remetente, destinatário, CPF/CNPJ, cidade, endereço, NF, chave e valor.</p>
     <label class="full upload">XML da NF-e<input type="file" id="xml_nfe" name="xml_nfe" accept=".xml,.zip"></label>
     <button type="button" class="btn" id="btnLerXml">OK - Preencher dados do XML</button>
   </div>
 
   <div class="form-grid">
     <label>Data<input type="date" name="data_abertura" value="{{ pendencia.data_abertura if pendencia else '' }}"></label>
+    <label>Remetente<input name="remetente" value="{{ pendencia.remetente if pendencia and pendencia.remetente is defined else '' }}" placeholder="Quem enviou/emitiu a NF"></label>
+    <label>Destinatário<input name="destinatario" list="clientes" value="{{ pendencia.destinatario if pendencia and pendencia.destinatario is defined and pendencia.destinatario else (pendencia.cliente if pendencia else '') }}" placeholder="Quem vai receber"></label>
     <label>Cliente<input name="cliente" list="clientes" value="{{ pendencia.cliente if pendencia else '' }}"></label>
     <label>Cidade<input name="cidade" list="cidades" value="{{ pendencia.cidade if pendencia else '' }}"></label>
     <label>Filial responsável<select name="filial_responsavel">{% for f in filiais_list %}<option value="{{f}}" {% if (pendencia and pendencia.filial_responsavel==f) or (not pendencia and f=='SJB') %}selected{% endif %}>{{f}}</option>{% endfor %}</select></label>
@@ -114,6 +116,8 @@ document.addEventListener("DOMContentLoaded", function () {
           return;
         }
         const dados = result.dados;
+        preencher("remetente", dados.remetente);
+        preencher("destinatario", dados.destinatario || dados.cliente);
         preencher("cliente", dados.cliente);
         preencher("cpf_cnpj", dados.cpf_cnpj);
         preencher("cidade", dados.cidade);
