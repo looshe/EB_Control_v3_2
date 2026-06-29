@@ -66,7 +66,7 @@
   </div>
 
   <label class="full">Descrição do que aconteceu<textarea name="descricao" rows="5">{{ pendencia.descricao if pendencia else '' }}</textarea></label>
-  <label class="full">Andamento / tratativa<textarea name="andamento" rows="5">{{ pendencia.andamento if pendencia else '' }}</textarea></label>
+  <label class="full">{{ 'Nova tratativa / andamento' if pendencia else 'Andamento / tratativa inicial' }}<textarea name="andamento" rows="5" placeholder="{{ 'Digite aqui uma nova tratativa. Ela será adicionada ao histórico sem apagar as anteriores.' if pendencia else '' }}"></textarea></label>
   <label class="full">Resolução<textarea name="resolucao" rows="4">{{ pendencia.resolucao if pendencia else '' }}</textarea></label>
   <label class="full upload">Anexar CT-e, NF, PDF, fotos ou comprovantes<input type="file" name="anexos" multiple></label>
 

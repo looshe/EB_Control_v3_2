@@ -14,7 +14,7 @@
 
         <div class="brand">
             <div class="brand-logo">
-                <img src="{{ url_for('static', filename='img/logo.jpeg') }}" alt="Logo">
+                <img src="{{ url_for('static', filename='img/logo_eb.png') }}" alt="Logo">
             </div>
 
             <div>
@@ -24,48 +24,40 @@
 
         <nav class="menu">
 
-            <a class="menu-item" href="{{ url_for('dashboard') }}">
-                <span>🏠</span>Dashboard
+            <a class="menu-item" href="{{ url_for('dashboard') }}">Dashboard
             </a>
 
-            <a class="menu-item" href="{{ url_for('nova_pendencia') }}">
-                <span>➕</span>Anotar Pendência
+            <a class="menu-item" href="{{ url_for('nova_pendencia') }}">Anotar Pendência
             </a>
 
-            <a class="menu-item" href="{{ url_for('pendencias', status='Pendente') }}">
-                <span>📌</span>Pendentes
+            <a class="menu-item" href="{{ url_for('pendencias', status='Pendente') }}">Pendentes
             </a>
 
-            <a class="menu-item" href="{{ url_for('pendencias', status='Em andamento') }}">
-                <span>🔄</span>Em andamento
+            <a class="menu-item" href="{{ url_for('pendencias', status='Em andamento') }}">Em andamento
             </a>
 
-            <a class="menu-item" href="{{ url_for('pendencias', status='Resolvido') }}">
-                <span>✅</span>Resolvidas
+            <a class="menu-item" href="{{ url_for('pendencias', status='Resolvido') }}">Resolvidas
             </a>
 
-            <a class="menu-item" href="{{ url_for('pendencias') }}">
-                <span>📋</span>Todas
+            <a class="menu-item" href="{{ url_for('pendencias') }}">Todas
             </a>
 
-            <a class="menu-item" href="{{ url_for('agendamentos') }}">
-                <span>📅</span>Agendamentos
+            <a class="menu-item" href="{{ url_for('agendamentos') }}">Agendamentos
             </a>
 
-            <a class="menu-item" href="{{ url_for('reentregas') }}">
-                <span>🚚</span>Reentregas
+            <a class="menu-item" href="{{ url_for('reentregas') }}">Reentregas
             </a>
 
-            <a class="menu-item" href="{{ url_for('cadastros') }}">
-                <span>⚙️</span>Cadastros
+            <a class="menu-item" href="{{ url_for('cadastros') }}">Cadastros
             </a>
 
-            <a class="menu-item" href="{{ url_for('exportar') }}">
-                <span>📤</span>Exportar CSV
+            <a class="menu-item" href="{{ url_for('exportar') }}">Exportar CSV
             </a>
 
-            <a class="menu-item" href="{{ url_for('historico_geral') }}">
-                <span>🕓</span>Histórico
+            <a class="menu-item" href="{{ url_for('historico_geral') }}">Histórico
+            </a>
+
+            <a class="menu-item" href="{{ url_for('lembretes') }}">Lembretes
             </a>
 
         </nav>
@@ -98,6 +90,24 @@
                 </div>
             {% endif %}
         {% endwith %}
+
+        {% if lembretes_vencidos %}
+            <div class="panel lembretes-alerta">
+                <h2>Lembretes vencidos</h2>
+                {% for l in lembretes_vencidos %}
+                    <div class="lembrete-alerta-item">
+                        <div>
+                            <strong>{{ l.titulo }}</strong>
+                            <span>{{ l.lembrar_em }}</span>
+                            {% if l.descricao %}<small>{{ l.descricao }}</small>{% endif %}
+                        </div>
+                        <form method="post" action="{{ url_for('concluir_lembrete', lid=l.id) }}">
+                            <button class="btn small" type="submit">Concluir</button>
+                        </form>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
 
         {% block content %}{% endblock %}
 

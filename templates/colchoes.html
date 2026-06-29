@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Colchões Ortobom</h1>
+    <p>Importação do relatório, confirmação de entrega por cidade, contatos e mensagem para motorista.</p>
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="panel colchoes-import">
+  <input type="hidden" name="acao" value="importar">
+  <div>
+    <h2>Importar relatório CSV</h2>
+    <p class="muted">Use o CSV do SSW/Ortobom. O sistema lê a linha 1 como cabeçalho e as linhas 2 como entregas.</p>
+  </div>
+  <label class="upload-inline">
+    <span>Arquivo CSV</span>
+    <input type="file" name="arquivo" accept=".csv,.txt" required>
+  </label>
+  <button class="btn primary" type="submit">📥 Importar CSV</button>
+</form>
+
+<section class="cards mini-cards colchoes-cards">
+  <div class="card"><span>Total filtrado</span><strong>{{ counts.total }}</strong></div>
+  <div class="card"><span>Com WhatsApp</span><strong>{{ counts.com_whatsapp }}</strong></div>
+  <div class="card alert"><span>Sem WhatsApp</span><strong>{{ counts.sem_whatsapp }}</strong></div>
+  <div class="card"><span>Ocorrências</span><strong>{{ counts.ocorrencias }}</strong></div>
+</section>
+
+<div class="panel colchoes-controls">
+  <form method="get" class="colchoes-filter-row">
+    <label>
+      Cidade
+      <select name="cidade" onchange="this.form.submit()">
+        <option value="Todas" {% if cidade == 'Todas' %}selected{% endif %}>Todas as cidades</option>
+        {% for c in cidades %}
+          <option value="{{ c }}" {% if cidade == c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      Ordenar por
+      <select name="sort" onchange="this.form.submit()">
+        <option value="cliente" {% if sort == 'cliente' %}selected{% endif %}>Cliente A-Z</option>
+        <option value="cidade" {% if sort == 'cidade' %}selected{% endif %}>Cidade</option>
+        <option value="telefone" {% if sort == 'telefone' %}selected{% endif %}>Sem WhatsApp primeiro</option>
+        <option value="nf" {% if sort == 'nf' %}selected{% endif %}>NF</option>
+      </select>
+    </label>
+
+    <label class="grow">
+      Buscar
+      <input name="q" value="{{ q }}" placeholder="Cliente, NF, cidade ou telefone">
+    </label>
+
+    <button class="btn" type="submit">Buscar</button>
+    <a class="btn" href="{{ url_for('colchoes') }}">Limpar</a>
+  </form>
+
+  <div class="colchoes-action-grid">
+    {% for key, label in [('segunda','Segunda'),('terca','Terça'),('quarta','Quarta'),('quinta','Quinta'),('sexta','Sexta'),('sabado','Sábado')] %}
+      <form method="post">
+        <input type="hidden" name="acao" value="gerar">
+        <input type="hidden" name="tipo" value="{{ key }}">
+        <input type="hidden" name="cidade" value="{{ cidade }}">
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="q" value="{{ q }}">
+        <button class="btn primary" type="submit">📅 {{ label }}</button>
+      </form>
+    {% endfor %}
+
+    <form method="post">
+      <input type="hidden" name="acao" value="gerar">
+      <input type="hidden" name="tipo" value="endereco">
+      <input type="hidden" name="cidade" value="{{ cidade }}">
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      <button class="btn" type="submit">📍 Confirmar endereço</button>
+    </form>
+
+    <form method="post">
+      <input type="hidden" name="acao" value="gerar">
+      <input type="hidden" name="tipo" value="motorista">
+      <input type="hidden" name="cidade" value="{{ cidade }}">
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      <button class="btn dark" type="submit">🚚 Mensagem motorista</button>
+    </form>
+
+    <form method="post">
+      <input type="hidden" name="acao" value="gerar">
+      <input type="hidden" name="tipo" value="contato_ortobom">
+      <input type="hidden" name="cidade" value="{{ cidade }}">
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      <button class="btn purple" type="submit">☎️ Solicitar contato Ortobom</button>
+    </form>
+  </div>
+</div>
+
+<div class="panel colchoes-resultados">
+  <h2>Mensagens geradas {% if cidade and cidade != 'Todas' %}- {{ cidade }}{% endif %}</h2>
+
+  {% if motorista_text %}
+    <div class="message-block driver-message">
+      <h3>Mensagem do motorista</h3>
+      <textarea id="motorista_text" readonly>{{ motorista_text }}</textarea>
+      <button class="btn" type="button" onclick="copyText('motorista_text')">📋 Copiar texto</button>
+    </div>
+  {% endif %}
+
+  {% if contato_text %}
+    <div class="message-block contact-message">
+      <h3>Solicitar contato Ortobom</h3>
+      <textarea id="contato_text" readonly>{{ contato_text }}</textarea>
+      <button class="btn" type="button" onclick="copyText('contato_text')">📋 Copiar texto</button>
+    </div>
+  {% endif %}
+
+  {% if mensagens %}
+    <div class="message-grid">
+      {% for m in mensagens %}
+        <div class="message-card {% if m.sem_whatsapp %}sem-whatsapp{% endif %}">
+          <div class="message-head">
+            <strong>{{ loop.index }}. {{ m.cliente }}</strong>
+            <span>NF {{ m.nf }}</span>
+          </div>
+          {% if m.sem_whatsapp %}
+            <span class="badge danger">Sem WhatsApp</span>
+          {% else %}
+            <a class="btn small success" href="{{ m.whatsapp }}" target="_blank">Abrir WhatsApp</a>
+          {% endif %}
+          <textarea id="msg_{{ loop.index }}" readonly>{{ m.texto }}</textarea>
+          <button class="btn small" type="button" onclick="copyText('msg_{{ loop.index }}')">Copiar texto</button>
+        </div>
+      {% endfor %}
+    </div>
+  {% elif not motorista_text and not contato_text %}
+    <p class="muted">Gere uma mensagem por dia, por cidade, para motorista ou para solicitar contatos Ortobom.</p>
+  {% endif %}
+</div>
+
+<section class="detail-grid colchoes-lists">
+  <div class="panel">
+    <h2>Clientes sem WhatsApp {% if cidade and cidade != 'Todas' %}- {{ cidade }}{% endif %}</h2>
+    {% set sem_count = namespace(total=0) %}
+    {% for r in rows if not r.telefone_limpo %}
+      {% set sem_count.total = sem_count.total + 1 %}
+      <div class="contact-missing-row">
+        <div>
+          <strong>{{ r.cliente }}</strong>
+          <span>NF {{ r.nf or '-' }} • {{ r.cidade }}</span>
+        </div>
+        <form method="post" action="{{ url_for('colchoes_contato') }}" class="inline-contact-form">
+          <input type="hidden" name="id" value="{{ r.id }}">
+          <input type="hidden" name="cidade" value="{{ cidade }}">
+          <input type="hidden" name="sort" value="{{ sort }}">
+          <input name="telefone" placeholder="Novo WhatsApp">
+          <button class="btn small" type="submit">Salvar</button>
+        </form>
+      </div>
+    {% endfor %}
+    {% if sem_count.total == 0 %}
+      <p class="muted">Nenhum cliente sem WhatsApp neste filtro.</p>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h2>Clientes importados {% if cidade and cidade != 'Todas' %}- {{ cidade }}{% endif %}</h2>
+    <div class="compact-table-wrap">
+      <table class="table colchoes-table">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>NF</th>
+            <th>Cidade</th>
+            <th>Bairro</th>
+            <th>Telefone</th>
+            <th>Endereço</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>{{ r.cliente }}</td>
+              <td>{{ r.nf or '-' }}</td>
+              <td>{{ r.cidade }}</td>
+              <td>{{ r.bairro or '-' }}</td>
+              <td>
+                {% if r.telefone_limpo %}
+                  <span class="badge success">{{ r.telefone }}</span>
+                {% else %}
+                  <span class="badge danger">Sem WhatsApp</span>
+                {% endif %}
+              </td>
+              <td>{{ r.endereco or '-' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="muted">Nenhum relatório importado ainda.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<script>
+function copyText(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.select();
+  el.setSelectionRange(0, 999999);
+  navigator.clipboard.writeText(el.value).then(() => {
+    alert("Texto copiado.");
+  }).catch(() => {
+    document.execCommand("copy");
+    alert("Texto copiado.");
+  });
+}
+</script>
+
+{% endblock %}

@@ -51,7 +51,7 @@
       <b>{{ p.remetente if p.remetente is defined and p.remetente else '-' }}</b>
 
       <span>Destinatário</span>
-      <b>{{ p.destinatario if p.destinatario is defined and p.destinatario else (p.cliente or '-') }}</b>
+      <b>{{ p|destinatario_exibicao }}</b>
 
       <span>NF</span>
       <b>{{ p.nf or '-' }}</b>
@@ -91,8 +91,30 @@
   <h2>Descrição</h2>
   <p class="longtext">{{ p.descricao or '-' }}</p>
 
-  <h2>Andamento</h2>
-  <p class="longtext">{{ p.andamento or '-' }}</p>
+  <h2>Andamentos / tratativas</h2>
+  <form method="post" action="{{ url_for('adicionar_tratativa', pid=p.id) }}" class="tratativa-form">
+    <textarea name="tratativa" rows="3" placeholder="Adicionar nova tratativa sem apagar as anteriores..."></textarea>
+    <button class="btn primary" type="submit">Adicionar tratativa</button>
+  </form>
+
+  <div class="tratativas-lista">
+    {% for t in tratativas %}
+      <div class="tratativa-item">
+        <strong>{{ t.criado_em }}</strong>
+        <span>{{ t.usuario_nome or 'Sistema' }}</span>
+        <p>{{ t.texto }}</p>
+      </div>
+    {% else %}
+      {% if p.andamento %}
+        <div class="tratativa-item">
+          <strong>Andamento atual</strong>
+          <p>{{ p.andamento }}</p>
+        </div>
+      {% else %}
+        <p class="muted">Nenhuma tratativa adicionada.</p>
+      {% endif %}
+    {% endfor %}
+  </div>
 
   <h2>Resolução</h2>
   <p class="longtext">{{ p.resolucao or '-' }}</p>

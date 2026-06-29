@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Lembretes</h1>
+    <p>Crie lembretes com data e hora para acompanhar tarefas do sistema.</p>
+  </div>
+</div>
+
+<form method="post" class="form-card lembrete-form-card">
+  <div class="form-grid">
+    <label>Título<input name="titulo" placeholder="Ex.: Cobrar retorno do cliente" required></label>
+    <label>Data<input type="date" name="data" required></label>
+    <label>Hora<input type="time" name="hora" required></label>
+    <label class="full">Descrição<textarea name="descricao" rows="3" placeholder="Detalhes do lembrete..."></textarea></label>
+  </div>
+  <div class="form-actions"><button class="btn primary" type="submit">Salvar lembrete</button></div>
+</form>
+
+<div class="panel">
+  <h2>Lembretes cadastrados</h2>
+  <table class="table lembretes-table">
+    <thead><tr><th>Quando</th><th>Título</th><th>Descrição</th><th>Status</th><th>Ações</th></tr></thead>
+    <tbody>
+      {% for l in rows %}
+      <tr>
+        <td>{{ l.lembrar_em }}</td>
+        <td>{{ l.titulo }}</td>
+        <td>{{ l.descricao or '-' }}</td>
+        <td><span class="badge {{ 'resolvido' if l.status == 'Concluído' else 'pendente' }}">{{ l.status }}</span></td>
+        <td>
+          {% if l.status != 'Concluído' %}
+          <form method="post" action="{{ url_for('concluir_lembrete', lid=l.id) }}">
+            <button class="btn small" type="submit">Concluir</button>
+          </form>
+          {% else %}-{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">Nenhum lembrete cadastrado.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

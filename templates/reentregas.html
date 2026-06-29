@@ -59,60 +59,54 @@
 </div>
 
 <div class="panel panel-compact reentregas-panel">
-  <table class="table big reentregas-fit-table">
+  <table class="table big reentregas-fit-table reentregas-resumo-table">
     <thead>
       <tr>
         <th class="r-check"></th>
+        <th class="r-client">Cliente</th>
+        <th class="r-doc">NF</th>
         <th class="r-status">Autorização</th>
         <th class="r-status">Agendamento</th>
-        <th class="r-code">Código</th>
-        <th class="r-client">Cliente</th>
-        <th class="r-city">Cidade</th>
-        <th class="r-doc">NF</th>
-        <th class="r-doc">CT-e</th>
-        <th class="r-motivo">Motivo</th>
-        <th class="r-phone">Telefone</th>
-        <th class="r-date">Ocorr.</th>
-        <th class="r-date">Reent.</th>
         <th class="r-update">Atualizar</th>
+        <th class="r-actions">Ações</th>
       </tr>
     </thead>
     <tbody>
       {% for r in rows %}
       <tr>
         <td class="r-check"><input type="checkbox" name="ids" value="{{ r.id }}" form="bulk-actions"></td>
+        <td class="r-client">
+          <strong class="text-cut" title="{{ r.cliente }}">{{ r.cliente }}</strong>
+          <small class="r-extra" title="{{ r.cidade or '-' }} • {{ r.motivo or '-' }}">
+            {{ r.cidade or '-' }}{% if r.motivo %} · {{ r.motivo }}{% endif %}
+          </small>
+        </td>
+        <td class="r-doc text-cut">{{ r.nf or '-' }}</td>
         <td class="r-status"><span class="badge reen-aut-{{ r.status_autorizacao|lower|replace(' ', '-')|replace('ç','c')|replace('ã','a') }}">{{ r.status_autorizacao }}</span></td>
         <td class="r-status"><span class="badge reen-ag-{{ r.status_agendamento|lower|replace(' ', '-') }}">{{ r.status_agendamento }}</span></td>
-        <td class="r-code">{{ r.codigo }}</td>
-        <td class="r-client text-cut" title="{{ r.cliente }}">{{ r.cliente }}</td>
-        <td class="r-city text-cut" title="{{ r.cidade or '-' }}">{{ r.cidade or '-' }}</td>
-        <td class="r-doc text-cut">{{ r.nf or '-' }}</td>
-        <td class="r-doc text-cut">{{ r.cte_ctr or '-' }}</td>
-        <td class="r-motivo text-cut" title="{{ r.motivo or '-' }}">{{ r.motivo or '-' }}</td>
-        <td class="r-phone text-cut" title="{{ r.telefone or 'Sem contato' }}">{{ r.telefone or 'Sem contato' }}</td>
-        <td class="r-date">{{ r.data_ocorrencia or '-' }}</td>
-        <td class="r-date">{{ r.data_reentrega or '-' }}</td>
         <td class="r-update">
-          <form method="post" action="{{ url_for('atualizar_reentrega') }}" class="inline-form reentrega-inline-form">
+          <form method="post" action="{{ url_for('atualizar_reentrega') }}" class="inline-form reentrega-inline-form reentrega-update-mini">
             <input type="hidden" name="id" value="{{ r.id }}">
-            <select name="status_autorizacao">
+            <select name="status_autorizacao" title="Autorização">
               {% for s in reentrega_aut_status %}<option value="{{s}}" {% if r.status_autorizacao==s %}selected{% endif %}>{{s}}</option>{% endfor %}
             </select>
-            <select name="status_agendamento">
+            <select name="status_agendamento" title="Agendamento">
               {% for s in reentrega_ag_status %}<option value="{{s}}" {% if r.status_agendamento==s %}selected{% endif %}>{{s}}</option>{% endfor %}
             </select>
-            <input name="telefone" value="{{ r.telefone or '' }}" placeholder="Telefone">
-            <input type="date" name="data_reentrega" value="{{ r.data_reentrega or '' }}">
-            <input name="observacao" value="{{ r.observacao or '' }}" placeholder="Obs">
+            <input name="telefone" value="{{ r.telefone or '' }}" placeholder="Telefone" title="Telefone">
+            <input type="date" name="data_reentrega" value="{{ r.data_reentrega or '' }}" title="Data reentrega">
+            <input name="observacao" value="{{ r.observacao or '' }}" placeholder="Obs" title="Observação">
             <button>Salvar</button>
           </form>
+        </td>
+        <td class="r-actions">
           <form method="post" action="{{ url_for('excluir_reentrega', rid=r.id) }}" class="inline-delete" onsubmit="return confirm('Excluir esta reentrega?');">
-            <button class="icon-btn danger" title="Excluir">🗑️</button>
+            <button class="icon-btn danger" title="Excluir">Excluir</button>
           </form>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="13" class="muted">Nenhuma reentrega encontrada.</td></tr>
+      <tr><td colspan="7" class="muted">Nenhuma reentrega encontrada.</td></tr>
       {% endfor %}
     </tbody>
   </table>

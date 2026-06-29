@@ -107,7 +107,7 @@
         <td>{{ p.data_abertura }}</td>
         <td>{{ p.nf or '-' }}</td>
         <td class="text-compact">{{ p.remetente if p.remetente is defined and p.remetente else '-' }}</td>
-        <td class="text-compact">{{ p.destinatario if p.destinatario is defined and p.destinatario else (p.cliente or '-') }}</td>
+        <td class="text-compact">{{ p|destinatario_exibicao }}</td>
         <td>{{ p.cidade or '-' }}</td>
         <td><span class="pill">{{ p.filial_responsavel or '-' }}</span></td>
         <td>{{ p.tipo or '-' }}</td>

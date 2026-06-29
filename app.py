@@ -191,6 +191,17 @@ def init_db() -> None:
             whatsapp TEXT NOT NULL,
             criado_em TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS lembretes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            titulo TEXT NOT NULL,
+            descricao TEXT,
+            lembrar_em TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Pendente',
+            usuario_id INTEGER,
+            criado_em TEXT NOT NULL,
+            concluido_em TEXT,
+            FOREIGN KEY(usuario_id) REFERENCES usuarios(id)
+        );
         CREATE TABLE IF NOT EXISTS agendamentos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             codigo TEXT UNIQUE,
@@ -259,6 +270,23 @@ def init_db() -> None:
             except sqlite3.OperationalError:
                 pass
     conn.commit()
+    # Migra andamentos antigos para o histórico de tratativas, sem duplicar.
+    # Isso preserva textos antigos que ficavam apenas no campo "andamento".
+    cur.execute(
+        """
+        INSERT INTO tratativas (pendencia_id, usuario_id, texto, criado_em)
+        SELECT p.id, NULL, p.andamento, COALESCE(NULLIF(p.atualizado_em, ''), p.data_abertura)
+        FROM pendencias p
+        WHERE p.andamento IS NOT NULL
+          AND TRIM(p.andamento) <> ''
+          AND NOT EXISTS (
+              SELECT 1
+              FROM tratativas t
+              WHERE t.pendencia_id = p.id
+          )
+        """
+    )
+    conn.commit()
     try:
         cur.execute("ALTER TABLE usuarios ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
@@ -313,6 +341,39 @@ def current_user() -> sqlite3.Row | None:
     return db().execute("SELECT * FROM usuarios WHERE id=? AND ativo=1", (uid,)).fetchone()
 
 
+def lembretes_vencidos(limit: int = 5) -> list[sqlite3.Row]:
+    uid = session.get("user_id")
+    if not uid:
+        return []
+    agora = datetime.now().strftime("%Y-%m-%d %H:%M")
+    return db().execute(
+        """
+        SELECT * FROM lembretes
+        WHERE status='Pendente'
+          AND lembrar_em <= ?
+          AND (usuario_id IS NULL OR usuario_id=?)
+        ORDER BY lembrar_em ASC, id ASC
+        LIMIT ?
+        """,
+        (agora, uid, limit),
+    ).fetchall()
+
+
+def adicionar_tratativa_db(pendencia_id: int, texto: str) -> None:
+    texto = (texto or "").strip()
+    if not texto:
+        return
+    execute(
+        "INSERT INTO tratativas (pendencia_id, usuario_id, texto, criado_em) VALUES (?, ?, ?, ?)",
+        (pendencia_id, session.get("user_id"), texto, now_str()),
+    )
+    execute(
+        "UPDATE pendencias SET andamento=?, atualizado_em=? WHERE id=?",
+        (texto, now_str(), pendencia_id),
+    )
+    log_action(pendencia_id, "Tratativa adicionada", texto)
+
+
 @app.context_processor
 def inject_globals() -> dict[str, Any]:
     return {
@@ -325,6 +386,7 @@ def inject_globals() -> dict[str, Any]:
         "reentrega_aut_status": REENTREGA_AUT_STATUS,
         "reentrega_ag_status": REENTREGA_AG_STATUS,
         "now_year": datetime.now().year,
+        "lembretes_vencidos": lembretes_vencidos(),
     }
 
 
@@ -390,6 +452,45 @@ def resumo_texto(value: str | None, limite: int = 90) -> str:
     if len(texto) <= limite:
         return texto
     return texto[:limite - 3].rstrip() + "..."
+
+
+def destinatario_exibicao(p: sqlite3.Row | dict) -> str:
+    """Retorna o cliente destinatário sem confundir com a cidade.
+
+    A coluna "Destinatário" deve mostrar o nome do cliente que recebe a mercadoria.
+    Em algumas versões antigas, o campo destinatario podia receber a cidade da entrega
+    por engano. Por isso, a exibição prioriza o campo cliente quando ele contém um
+    nome válido e ignora valores com aparência de cidade, como "Novo Hamburgo - RS".
+    """
+    def get(campo: str) -> str:
+        try:
+            return (p[campo] or "").strip()
+        except Exception:
+            return ""
+
+    def parece_cidade(valor: str, cidade_ref: str = "") -> bool:
+        texto = (valor or "").strip()
+        if not texto:
+            return False
+        if cidade_ref and norm(texto) == norm(cidade_ref):
+            return True
+        partes = texto.rsplit(" - ", 1)
+        if len(partes) == 2 and len(partes[1].strip()) == 2 and partes[1].strip().isalpha():
+            return True
+        return False
+
+    destinatario = get("destinatario")
+    cliente = get("cliente")
+    cidade = get("cidade")
+
+    cliente_valido = cliente and not parece_cidade(cliente, cidade)
+    destinatario_valido = destinatario and not parece_cidade(destinatario, cidade)
+
+    if cliente_valido:
+        return cliente
+    if destinatario_valido:
+        return destinatario
+    return destinatario or cliente or "-"
 
 
 def dias_aberto_valor(p: sqlite3.Row) -> int | str:
@@ -646,6 +747,8 @@ def nova_pendencia():
         pid = cur.lastrowid
         codigo = f"OC-{pid:06d}"
         execute("UPDATE pendencias SET codigo=? WHERE id=?", (codigo, pid))
+        if data.get("andamento"):
+            adicionar_tratativa_db(pid, data["andamento"])
         add_cadastro("cliente", data["cliente"])
         add_cadastro("cidade", data["cidade"])
         if data["tipo"]:
@@ -664,25 +767,13 @@ def nova_pendencia():
 @login_required
 def adicionar_tratativa(pid: int):
     fetch_pendencia(pid)
-
     texto = (request.form.get("tratativa") or "").strip()
 
     if not texto:
         flash("Digite uma tratativa antes de salvar.", "erro")
         return redirect(url_for("detalhe_pendencia", pid=pid))
 
-    execute(
-        "INSERT INTO tratativas (pendencia_id, usuario_id, texto, criado_em) VALUES (?, ?, ?, ?)",
-        (pid, session.get("user_id"), texto, now_str()),
-    )
-
-    execute(
-        "UPDATE pendencias SET andamento=?, atualizado_em=? WHERE id=?",
-        (texto, now_str(), pid),
-    )
-
-    log_action(pid, "Tratativa adicionada", texto)
-
+    adicionar_tratativa_db(pid, texto)
     flash("Tratativa adicionada.", "ok")
     return redirect(url_for("detalhe_pendencia", pid=pid))
 
@@ -751,12 +842,15 @@ def editar_pendencia(pid: int):
             data_resolucao = now_str()
         elif data["status"] != "Resolvido":
             data_resolucao = ""
+        andamento_atual = data["andamento"] if data.get("andamento") else (p["andamento"] or "")
         execute(
             """
             UPDATE pendencias SET data_abertura=?, data_resolucao=?, remetente=?, destinatario=?, cliente=?, cliente_norm=?, cidade=?, cidade_norm=?, filial_responsavel=?, cpf_cnpj=?, endereco=?, chave_nfe=?, valor_nf=?, nf=?, cte_ctr=?, status=?, tipo=?, criticidade=?, descricao=?, andamento=?, resolucao=?, atualizado_em=? WHERE id=?
             """,
-            (data["data_abertura"], data_resolucao, data["remetente"], data["destinatario"], data["cliente"], norm(data["cliente"]), data["cidade"], norm(data["cidade"]), data["filial_responsavel"], data["cpf_cnpj"], data["endereco"], data["chave_nfe"], data["valor_nf"], data["nf"], data["cte_ctr"], data["status"], data["tipo"], data["criticidade"], data["descricao"], data["andamento"], data["resolucao"], now_str(), pid),
+            (data["data_abertura"], data_resolucao, data["remetente"], data["destinatario"], data["cliente"], norm(data["cliente"]), data["cidade"], norm(data["cidade"]), data["filial_responsavel"], data["cpf_cnpj"], data["endereco"], data["chave_nfe"], data["valor_nf"], data["nf"], data["cte_ctr"], data["status"], data["tipo"], data["criticidade"], data["descricao"], andamento_atual, data["resolucao"], now_str(), pid),
         )
+        if data.get("andamento"):
+            adicionar_tratativa_db(pid, data["andamento"])
         add_cadastro("cliente", data["cliente"])
         add_cadastro("cidade", data["cidade"])
         save_envolvidos(pid, request.form.getlist("envolvido_tipo[]"), request.form.getlist("envolvido_nome[]"))
@@ -1017,7 +1111,7 @@ def pendencias_exportar_csv():
                 p["data_abertura"],
                 p["nf"] or "",
                 p["remetente"] or "",
-                p["destinatario"] or p["cliente"] or "",
+                destinatario_exibicao(p),
                 p["cidade"] or "",
                 p["filial_responsavel"] or "",
                 p["tipo"] or "",
@@ -1713,6 +1807,49 @@ def novo_contato():
     return redirect(url_for("cadastros"))
 
 
+@app.route("/lembretes", methods=["GET", "POST"])
+@login_required
+def lembretes():
+    if request.method == "POST":
+        titulo = (request.form.get("titulo") or "").strip()
+        descricao = (request.form.get("descricao") or "").strip()
+        data = (request.form.get("data") or "").strip()
+        hora = (request.form.get("hora") or "").strip()
+
+        if not titulo or not data or not hora:
+            flash("Preencha título, data e hora do lembrete.", "erro")
+            return redirect(url_for("lembretes"))
+
+        lembrar_em = f"{data} {hora}"
+        execute(
+            "INSERT INTO lembretes (titulo, descricao, lembrar_em, status, usuario_id, criado_em) VALUES (?, ?, ?, 'Pendente', ?, ?)",
+            (titulo, descricao, lembrar_em, session.get("user_id"), now_str()),
+        )
+        flash("Lembrete criado.", "ok")
+        return redirect(url_for("lembretes"))
+
+    rows = db().execute(
+        """
+        SELECT * FROM lembretes
+        WHERE usuario_id=? OR usuario_id IS NULL
+        ORDER BY CASE status WHEN 'Pendente' THEN 1 ELSE 2 END, lembrar_em ASC, id DESC
+        """,
+        (session.get("user_id"),),
+    ).fetchall()
+    return render_template("lembretes.html", rows=rows)
+
+
+@app.route("/lembrete/<int:lid>/concluir", methods=["POST"])
+@login_required
+def concluir_lembrete(lid: int):
+    execute(
+        "UPDATE lembretes SET status='Concluído', concluido_em=? WHERE id=? AND (usuario_id=? OR usuario_id IS NULL)",
+        (now_str(), lid, session.get("user_id")),
+    )
+    flash("Lembrete concluído.", "ok")
+    return redirect(request.referrer or url_for("lembretes"))
+
+
 @app.template_filter("envolvidos_preview")
 def envolvidos_preview(pid: int) -> str:
     ev = db().execute("SELECT tipo, nome FROM envolvidos WHERE pendencia_id=? ORDER BY id", (pid,)).fetchall()
@@ -1732,6 +1869,23 @@ def dias_aberto(p: sqlite3.Row) -> int | str:
         return max((d1 - d0).days, 0)
     except Exception:
         return "-"
+
+
+@app.template_filter("destinatario_exibicao")
+def destinatario_exibicao_filter(p: sqlite3.Row | dict) -> str:
+    return destinatario_exibicao(p)
+
+
+def data_br(valor: str | None) -> str:
+    valor = (valor or "").strip()
+    if len(valor) >= 10 and valor[4:5] == "-" and valor[7:8] == "-":
+        return f"{valor[8:10]}/{valor[5:7]}/{valor[0:4]}"
+    return valor or "-"
+
+
+@app.template_filter("data_br")
+def data_br_filter(valor: str | None) -> str:
+    return data_br(valor)
 
 
 if __name__ == "__main__":

@@ -134,12 +134,11 @@
       <tr>
         <th>Código</th>
         <th>Cliente</th>
+        <th>Agendada</th>
         <th>Cidade</th>
         <th>CPF/CNPJ</th>
         <th>NF</th>
         <th>CT-e</th>
-        <th>Solicitada</th>
-        <th>Agendada</th>
         <th>Status</th>
         <th>Observação</th>
       </tr>
@@ -150,18 +149,17 @@
       <tr>
         <td>{{ a.codigo or '-' }}</td>
         <td>{{ a.cliente or '-' }}</td>
+        <td>{{ a.data_agendada|data_br }}</td>
         <td>{{ a.cidade or '-' }}</td>
         <td>{{ a.cpf_cnpj or '-' }}</td>
         <td>{{ a.nf or '-' }}</td>
         <td>{{ a.cte_ctr or '-' }}</td>
-        <td>{{ a.data_solicitada or '-' }}</td>
-        <td>{{ a.data_agendada or '-' }}</td>
         <td class="status">{{ a.status or '-' }}</td>
         <td>{{ a.observacao or '-' }}</td>
       </tr>
       {% else %}
       <tr>
-        <td colspan="10">Nenhum agendamento encontrado.</td>
+        <td colspan="9">Nenhum agendamento encontrado.</td>
       </tr>
       {% endfor %}
     </tbody>

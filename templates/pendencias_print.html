@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Relatório de Pendências</title>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:18px;font-size:11px}
+    .head{display:flex;justify-content:space-between;gap:16px;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}
+    h1{font-size:18px;margin:0 0 4px}
+    .muted{color:#555}
+    .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+    .summary div{border:1px solid #999;padding:6px;text-align:center}
+    .summary b{font-size:15px;display:block}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th,td{border:1px solid #999;padding:4px;vertical-align:top;word-wrap:break-word}
+    th{background:#eee;font-size:10px;text-transform:uppercase}
+    td{font-size:10px}
+    .nf{width:7%}.data{width:7%}.tipo{width:9%}.cidade{width:10%}.status{width:8%}.resol{width:8%}
+    .rem{width:13%}.dest{width:13%}.desc{width:16%}.env{width:13%}
+    .status-text{font-weight:bold;text-transform:uppercase}
+    .footer{margin-top:10px;font-size:10px;color:#555}
+    @page{size:A4 landscape;margin:10mm}
+    @media print{body{margin:0}.no-print{display:none}}
+  </style>
+</head>
+<body>
+  <div class="head">
+    <div>
+      <h1>Expresso Batistense - Relatório de Pendências</h1>
+      <div class="muted">Período: {{ filtros.periodo_label }}{% if filtros.tipo %} • Tipo: {{ filtros.tipo }}{% endif %}{% if filtros.envolvido %} • Envolvido: {{ filtros.envolvido }}{% endif %}{% if filtros.status %} • Status: {{ filtros.status }}{% endif %}{% if filtros.filial %} • Filial: {{ filtros.filial }}{% endif %}</div>
+    </div>
+    <div class="muted">Gerado em:<br>{{ gerado_em }}</div>
+  </div>
+
+  <div class="summary">
+    <div><b>{{ counts.total }}</b>Total</div>
+    <div><b>{{ counts.pendente }}</b>Pendentes</div>
+    <div><b>{{ counts.andamento }}</b>Em andamento</div>
+    <div><b>{{ counts.resolvido }}</b>Resolvidas</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="data">Data</th>
+        <th class="nf">NF</th>
+        <th class="rem">Remetente</th>
+        <th class="dest">Destinatário</th>
+        <th class="cidade">Cidade</th>
+        <th class="tipo">Tipo</th>
+        <th class="desc">Descrição</th>
+        <th class="env">Envolvidos</th>
+        <th class="status">Status</th>
+        <th class="resol">Resolução</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in pendencias %}
+      <tr>
+        <td>{{ p.data_abertura }}</td>
+        <td>{{ p.nf or '-' }}</td>
+        <td>{{ p.remetente if p.remetente is defined and p.remetente else '-' }}</td>
+        <td>{{ p|destinatario_exibicao }}</td>
+        <td>{{ p.cidade or '-' }}</td>
+        <td>{{ p.tipo or '-' }}</td>
+        <td>{{ p.descricao[:160] ~ ('...' if p.descricao and p.descricao|length > 160 else '') if p.descricao else '-' }}</td>
+        <td>{{ p.id|envolvidos_preview }}</td>
+        <td class="status-text">{{ p.status }}</td>
+        <td>{{ p.resolucao if p.resolucao else '-' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10">Nenhuma pendência encontrada para os filtros escolhidos.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="footer">Relatório gerado pelo EB Control. Impressão otimizada para A4 horizontal em preto e branco.</div>
+  <script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>
+</body>
+</html>
